@@ -7,6 +7,7 @@
 
 'use strict';
 
+var fs = require('fs');
 var should = require('should');
 var YAML = require('js-yaml');
 var Loaders = require('./');
@@ -15,15 +16,13 @@ var loaders;
 describe('loaders', function () {
   beforeEach(function() {
     loaders = new Loaders();
-  });
 
-  it('should register a loader:', function () {
-    loaders.register('yaml', function yaml(fp, options) {
-      return YAML.safeLoad(fp, options);
+    loaders.register('yaml', function yaml(fp) {
+      return YAML.safeLoad(fp);
     });
 
-    loaders.register('yml', function yml(fp, options) {
-      return YAML.safeLoad(fp, options);
+    loaders.register('yml', function yml(fp) {
+      return YAML.safeLoad(fp);
     });
 
     loaders.register('json', function json(fp) {
@@ -37,15 +36,19 @@ describe('loaders', function () {
     loaders.register('hbs', function hbs(fp) {
       return fs.readFileSync(fp, 'utf8');
     });
-
-    loaders.register('hbs', function hbs(fp) {
-      return fs.readFileSync(fp, 'utf8');
-    });
-
-    loaders.compose('foo', ['txt', 'yaml']);
-
-    console.log(loaders.cache)
-    loaders.cache.should.have.properties('yaml', 'yml');
   });
 
+  it('should register loaders:', function () {
+    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'txt', 'hbs');
+  });
+
+  it('should compose a loader from other loaders:', function () {
+    loaders.compose('foo', ['txt', 'yaml']);
+    loaders.cache.should.have.property('foo');
+  });
+
+  it('should run a loader stack on the given filepath:', function () {
+    loaders.compose('foo', ['txt', 'yaml']);
+    loaders.load('fixtures/a.foo').should.eql({a: 'b'});
+  });
 });
