@@ -1,0 +1,43 @@
+{
+  "name": "loader-cache",
+  "description": "Register loader functions to automatically read and parse file contents based on file extension.",
+  "version": "0.1.0",
+  "homepage": "https://github.com/jonschlinkert/loader-cache",
+  "author": {
+    "name": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jonschlinkert/loader-cache.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jonschlinkert/loader-cache/issues"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/jonschlinkert/loader-cache/blob/master/LICENSE-MIT"
+    }
+  ],
+  "main": "index.js",
+  "engines": {
+    "node": ">=0.10.0"
+  },
+  "scripts": {
+    "test": "mocha -R spec"
+  },
+  "devDependencies": {
+    "js-yaml": "^3.2.3",
+    "mocha": "*",
+    "should": "*"
+  },
+  "keywords": [
+    "load",
+    "loader",
+    "parse",
+    "parser",
+    "read",
+    "reader"
+  ]
+}
