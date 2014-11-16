@@ -1,6 +1,6 @@
 {
   "name": "loader-cache",
-  "description": "Register loader functions to automatically read and parse file contents based on file extension.",
+  "description": "Register loader functions that dynamically read, parse or otherwise transform file contents when the name of the loader matches a file extension. You can also compose loaders from other loaders.",
   "version": "0.1.0",
   "homepage": "https://github.com/jonschlinkert/loader-cache",
   "author": {
@@ -33,6 +33,10 @@
     "should": "*"
   },
   "keywords": [
+    "content",
+    "ext",
+    "extension",
+    "file",
     "load",
     "loader",
     "parse",
