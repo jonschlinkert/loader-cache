@@ -17,12 +17,12 @@ describe('loaders', function () {
   beforeEach(function() {
     loaders = new Loaders();
 
-    loaders.register('yaml', function yaml(fp) {
-      return YAML.safeLoad(fp);
+    loaders.register('yaml', function yaml(str) {
+      return YAML.safeLoad(str);
     });
 
-    loaders.register('yml', function yml(fp) {
-      return YAML.safeLoad(fp);
+    loaders.register('yml', function yml(str) {
+      return YAML.safeLoad(str);
     });
 
     loaders.register('json', function json(fp) {
@@ -44,7 +44,7 @@ describe('loaders', function () {
   });
 
   it('should register loaders:', function () {
-    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs');
+    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
   });
 
   it('should compose a loader from other loaders with the `.compose()` method:', function () {

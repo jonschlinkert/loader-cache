@@ -99,16 +99,17 @@ Loaders.prototype.register = function(ext, fn) {
  *
  * @param {String} `ext` File extension to select the loader or loader stack to use.
  * @param {String} `loaders` Array of loader names.
- * @return {String}
+ * @return {Object} `Loaders` to enable chaining
  * @api private
  */
 
 Loaders.prototype.compose = function(ext, loaders) {
-  return loaders.reduce(function(stack, loader) {
+  loaders.reduce(function(stack, loader) {
     stack[ext] = stack[ext] || [];
     stack[ext] = stack[ext].concat(this.cache[loader]);
     return stack;
   }.bind(this), this.cache);
+  return this;
 };
 
 /**
