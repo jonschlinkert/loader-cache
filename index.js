@@ -251,7 +251,7 @@ Loaders.prototype.compose = function(ext, loaders) {
 };
 
 /**
- * Validate loaders associated with a given laoder type.
+ * Validate loaders associated with a given loader type.
  *
  * **Example**
  *
@@ -268,7 +268,7 @@ Loaders.prototype.compose = function(ext, loaders) {
 Loaders.prototype.validate = function(type, fns) {
   fns.forEach(function (fn) {
     if (!fn[type]) {
-      throw new Error('Invalid loader type for ' + (fn.name == undefined ? 'annoyomous' : fn.name) + '. Expected ' + type);
+      throw new Error('Invalid loader type for ' + (fn.name == undefined ? 'anonymous' : fn.name) + '. Expected ' + type);
     }
   });
   return true;

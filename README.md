@@ -166,7 +166,7 @@ loaders.registerStream('yml', ['read', 'yaml']);
 
 ### [.validate](index.js#L268)
 
-Validate loaders associated with a given laoder type.
+Validate loaders associated with a given loader type.
 
 * `type` **{String}**: Type of loader to check for.    
 * `fns` **{Array}**: Loader functions to validate    
