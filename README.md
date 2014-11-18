@@ -43,7 +43,7 @@ var readers = require('loader-cache');
 ```
 
 ## API
-### [Loaders](index.js#L33)
+### [Loaders](index.js#L30)
 
 Create a new instance of `Loader`
 
@@ -52,7 +52,7 @@ var Loader = require('loader');
 var loader = new Loader();
 ```
 
-### [.register](index.js#L67)
+### [.register](index.js#L64)
 
 Register the given loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -77,7 +77,7 @@ loaders.register('read', function(fp) {
 loaders.register('yml', ['read', 'yaml']);
 ```
 
-### [.registerAsync](index.js#L108)
+### [.registerAsync](index.js#L105)
 
 Register the given async loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -102,7 +102,7 @@ loaders.registerAsync('read', function(fp, next) {
 loaders.registerAsync('yml', ['read', 'yaml']);
 ```
 
-### [.registerPromise](index.js#L160)
+### [.registerPromise](index.js#L157)
 
 Register the given promise loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -137,7 +137,7 @@ loaders.registerPromise('read', function(fp) {
 loaders.registerPromise('yml', ['read', 'yaml']);
 ```
 
-### [.registerStream](index.js#L204)
+### [.registerStream](index.js#L201)
 
 Register the given stream loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -164,7 +164,7 @@ loaders.registerStream('read', function(fp) {
 loaders.registerStream('yml', ['read', 'yaml']);
 ```
 
-### [.validate](index.js#L271)
+### [.validate](index.js#L268)
 
 Validate loaders associated with a given laoder type.
 
@@ -178,7 +178,7 @@ Validate loaders associated with a given laoder type.
 var valid = loaders.validate('async', fns);
 ```
 
-### [.load](index.js#L296)
+### [.load](index.js#L293)
 
 Run loaders associated with `ext` of the given filepath.
 
@@ -193,7 +193,7 @@ Run loaders associated with `ext` of the given filepath.
 loaders.load('config.yml');
 ```
 
-### [.loadAsync](index.js#L324)
+### [.loadAsync](index.js#L321)
 
 Run async loaders associated with `ext` of the given filepath.
 
@@ -210,7 +210,7 @@ loaders.loadAsync('config.yml', function (err, obj) {
 });
 ```
 
-### [.loadPromise](index.js#L356)
+### [.loadPromise](index.js#L354)
 
 Run promise loaders associated with `ext` of the given filepath.
 
@@ -226,13 +226,13 @@ loaders.loadPromise('config.yml').then(function (results) {
 });
 ```
 
-### [.loadStream](index.js#L386)
+### [.loadStream](index.js#L385)
 
 Run stream loaders associated with `ext` of the given filepath.
 
 * `fp` **{String}**: File path to load.    
 * `options` **{Object}**: Options to pass to whatever loaders are defined.    
-* `returns` **{Promise}**: a stream that will be fulfilled later  
+* `returns` **{Stream}**: a stream that will be fulfilled later  
 
 **Example**
 
