@@ -7,9 +7,6 @@
 
 'use strict';
 
-var Promise = require('bluebird');
-var es = require('event-stream');
-var async = require('async');
 var path = require('path');
 
 /**
@@ -322,6 +319,7 @@ Loaders.prototype.load = function(fp, options) {
  */
 
 Loaders.prototype.loadAsync = function(fp, options, done) {
+  var async = require('async');
   if (typeof options === 'function') {
     done = options;
     options = {};
@@ -354,6 +352,7 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
  */
 
 Loaders.prototype.loadPromise = function(fp, options) {
+  var Promise = require('bluebird');
   var current = Promise.resolve();
   options = options || {};
   var ext = path.extname(fp);
@@ -379,11 +378,12 @@ Loaders.prototype.loadPromise = function(fp, options) {
  *
  * @param {String} `fp` File path to load.
  * @param {Object} `options` Options to pass to whatever loaders are defined.
- * @return {Promise} a stream that will be fulfilled later
+ * @return {Stream} a stream that will be fulfilled later
  * @api public
  */
 
 Loaders.prototype.loadStream = function(fp, options) {
+  var es = require('event-stream');
   options = options || {};
   var ext = path.extname(fp);
   var fns = this.cache[ext.slice(1)];
