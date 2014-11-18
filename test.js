@@ -8,6 +8,7 @@
 'use strict';
 
 var Promise = require('bluebird');
+var es = require('event-stream');
 var should = require('should');
 var YAML = require('js-yaml');
 var Loaders = require('./');
@@ -192,26 +193,98 @@ describe('loaders promise', function () {
     loaders.cache.should.have.property('foo');
   });
 
-  it('should pass the value returned from a promise loader to the next promise loader:', function () {
+  it('should pass the value returned from a promise loader to the next promise loader:', function (done) {
     loaders.registerPromise('bar', ['read', 'yaml', 'data']);
     loaders.loadPromise('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
+      done();
     });
   });
 
-  it('should pass the value returned from a promise loader to the next promise loader:', function () {
+  it('should pass the value returned from a promise loader to the next promise loader:', function (done) {
     loaders.compose('bar', ['read', 'yaml', 'data']);
     loaders.loadPromise('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
+      done();
     });
   });
 
-  it('should compose a promise loader from other promise loaders:', function () {
+  it('should compose a promise loader from other promise loaders:', function (done) {
     loaders.compose('parse', ['read', 'yaml']);
     loaders.compose('extend', ['data']);
     loaders.compose('bar', ['parse', 'extend']);
     loaders.loadPromise('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
+      done();
     });
+  });
+});
+
+
+describe('loaders stream', function () {
+  beforeEach(function() {
+    loaders = new Loaders();
+
+    loaders.registerStream('yaml', es.through(function yaml(str) {
+      this.emit('data', YAML.safeLoad(str));
+    }));
+
+    loaders.registerStream('yml', es.through(function yml(str) {
+      this.emit('data', YAML.safeLoad(str));
+    }));
+
+    loaders.registerStream('json', es.through(function json(fp) {
+      this.emit('data', require(path.resolve(fp)));
+    }));
+
+    loaders.registerStream('read', es.through(function read(fp) {
+      this.emit('data', fs.readFileSync(fp, 'utf8'));
+    }));
+
+    loaders.registerStream('hbs', es.through(function hbs(fp) {
+      this.emit('data', fs.readFileSync(fp, 'utf8'));
+    }));
+
+    loaders.registerStream('data', es.through(function data(obj) {
+      obj.e = 'f';
+      this.emit('data', obj);
+    }));
+  });
+
+  it('should register stream loaders:', function () {
+    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
+  });
+
+  it('should compose a stream loader from other stream loaders with the `.compose()` method:', function () {
+    loaders.compose('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
+  });
+
+  it('should compose a stream loader from other stream loaders with the `.register()` method:', function () {
+    loaders.registerStream('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
+  });
+
+  it('should pass the value returned from a stream loader to the next stream loader:', function (done) {
+    loaders.registerStream('bar', ['read', 'yaml', 'data']);
+    loaders.loadStream('fixtures/a.bar').on('data', function (results) {
+      results.should.eql({c: 'd', e: 'f'});
+    }).on('end', done);
+  });
+
+  it('should pass the value returned from a stream loader to the next stream loader:', function (done) {
+    loaders.compose('bar', ['read', 'yaml', 'data']);
+    loaders.loadStream('fixtures/a.bar').on('data', function (results) {
+      results.should.eql({c: 'd', e: 'f'});
+    }).on('end', done);
+  });
+
+  it('should compose a stream loader from other stream loaders:', function (done) {
+    loaders.compose('parse', ['read', 'yaml']);
+    loaders.compose('extend', ['data']);
+    loaders.compose('bar', ['parse', 'extend']);
+    loaders.loadStream('fixtures/a.bar').on('data', function (results) {
+      results.should.eql({c: 'd', e: 'f'});
+    }).on('end', done);
   });
 });

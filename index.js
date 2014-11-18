@@ -8,6 +8,7 @@
 'use strict';
 
 var Promise = require('bluebird');
+var es = require('event-stream');
 var async = require('async');
 var path = require('path');
 
@@ -169,6 +170,50 @@ Loaders.prototype.registerPromise = function(ext, fn) {
 };
 
 /**
+ * Register the given stream loader callback `fn` as `ext`. Any arbitrary
+ * name can be assigned to a loader, however, the loader will only be
+ * called when either:
+ *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
+ *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ *
+ * **Examples**
+ *
+ * ```js
+ * // register an stream loader for parsing YAML
+ * loaders.registerStream('yaml', es.through(function(fp) {
+ *   this.emit('data', YAML.safeLoad(fp));
+ * });
+ *
+ * // register a loader to be used in other loaders
+ * loaders.registerStream('read', function(fp) {
+ *   fs.readFile(fp, 'utf8', function (err, content) {
+ *     this.emit('data', content);
+ *   });
+ * });
+ *
+ * // create a new loader from the `yaml` and `read` loaders.
+ * loaders.registerStream('yml', ['read', 'yaml']);
+ * ```
+ *
+ * @param {String|Array} `ext` File extension or name of the loader.
+ * @param {Stream|Array} `fn` A stream loader, or create a loader from other others by passing an array of names.
+ * @return {Object} `Loaders` to enable chaining
+ * @api public
+ */
+
+Loaders.prototype.registerStream = function(ext, fn) {
+  ext = (ext[0] === '.') ? ext.slice(1) : ext;
+
+  if (Array.isArray(fn)) {
+    return this.compose(ext, fn);
+  }
+
+  fn.stream = true;
+  this.cache[ext] = [fn];
+  return this;
+};
+
+/**
  * Create a loader from other (previously cached) loaders. For
  * example, you might create a loader like the following:
  *
@@ -273,7 +318,7 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
  *
  * ```js
  * // this will run the `yml` promise loader from the `.compose()` example
- * loaders.loadPromise('config.yml', function (err, obj) {
+ * loaders.loadPromise('config.yml').then(function (results) {
  * });
  * ```
  *
@@ -285,10 +330,7 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
 
 Loaders.prototype.loadPromise = function(fp, options) {
   var current = Promise.resolve();
-  if (typeof options === 'function') {
-    done = options;
-    options = {};
-  }
+  options = options || {};
   var ext = path.extname(fp);
   var fns = this.cache[ext.slice(1)];
   if (!fns) return current.then(function () { return fp; });
@@ -296,4 +338,37 @@ Loaders.prototype.loadPromise = function(fp, options) {
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
   }, fp);
+};
+
+/**
+ * Run stream loaders associated with `ext` of the given filepath.
+ *
+ * **Example**
+ *
+ * ```js
+ * // this will run the `yml` stream loader from the `.compose()` example
+ * loaders.LoadStream('config.yml').on('data', function (results) {
+ * });
+ * ```
+ *
+ * @param {String} `fp` File path to load.
+ * @param {Object} `options` Options to pass to whatever loaders are defined.
+ * @return {Promise} a stream that will be fulfilled later
+ * @api public
+ */
+
+Loaders.prototype.loadStream = function(fp, options) {
+  options = options || {};
+  var ext = path.extname(fp);
+  var fns = this.cache[ext.slice(1)];
+  if (!fns) return fns = [es.through(function (fp) { 
+    this.emit('data', fp);
+  })];
+
+  var stream = es.pipe.apply(es, fns);
+  process.nextTick(function () {
+    stream.write(fp);
+    stream.end();
+  });
+  return stream;
 };
