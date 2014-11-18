@@ -7,6 +7,7 @@
 
 'use strict';
 
+var Promise = require('bluebird');
 var async = require('async');
 var path = require('path');
 
@@ -116,6 +117,58 @@ Loaders.prototype.registerAsync = function(ext, fn) {
 };
 
 /**
+ * Register the given promise loader callback `fn` as `ext`. Any arbitrary
+ * name can be assigned to a loader, however, the loader will only be
+ * called when either:
+ *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
+ *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ *
+ * **Examples**
+ *
+ * ```js
+ * // register an promise loader for parsing YAML
+ * loaders.registerPromise('yaml', function(fp) {
+ *    var Promise = require('bluebird');
+ *    var deferred = Promise.pending();
+ *    process.nextTick(function () {
+ *      deferred.fulfill(YAML.safeLoad(fp));
+ *    });
+ *    return deferred.promise;
+ * });
+ *
+ * // register a loader to be used in other loaders
+ * loaders.registerPromise('read', function(fp) {
+ *    var Promise = require('bluebird');
+ *    var deferred = Promise.pending();
+ *    fs.readFile(fp, 'utf8', function (err, content) {
+ *      deferred.fulfill(content);
+ *    });
+ *    return deferred.promise;
+ * });
+ *
+ * // create a new loader from the `yaml` and `read` loaders.
+ * loaders.registerPromise('yml', ['read', 'yaml']);
+ * ```
+ *
+ * @param {String|Array} `ext` File extension or name of the loader.
+ * @param {Function|Array} `fn` A loader function that returns a promise, or create a loader from other others by passing an array of names.
+ * @return {Object} `Loaders` to enable chaining
+ * @api public
+ */
+
+Loaders.prototype.registerPromise = function(ext, fn) {
+  ext = (ext[0] === '.') ? ext.slice(1) : ext;
+
+  if (Array.isArray(fn)) {
+    return this.compose(ext, fn);
+  }
+
+  fn.promise = true;
+  this.cache[ext] = [fn];
+  return this;
+};
+
+/**
  * Create a loader from other (previously cached) loaders. For
  * example, you might create a loader like the following:
  *
@@ -188,7 +241,7 @@ Loaders.prototype.load = function(fp, options) {
  *
  * ```js
  * // this will run the `yml` async loader from the `.compose()` example
- * loaders.load('config.yml', function (err, obj) {
+ * loaders.loadAsync('config.yml', function (err, obj) {
  * });
  * ```
  *
@@ -211,4 +264,36 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
   async.reduce(fns, fp, function (acc, fn, next) {
     fn(acc, options, next);
   }, done);
+};
+
+/**
+ * Run promise loaders associated with `ext` of the given filepath.
+ *
+ * **Example**
+ *
+ * ```js
+ * // this will run the `yml` promise loader from the `.compose()` example
+ * loaders.loadPromise('config.yml', function (err, obj) {
+ * });
+ * ```
+ *
+ * @param {String} `fp` File path to load.
+ * @param {Object} `options` Options to pass to whatever loaders are defined.
+ * @return {Promise} a promise that will be fulfilled later
+ * @api public
+ */
+
+Loaders.prototype.loadPromise = function(fp, options) {
+  var current = Promise.resolve();
+  if (typeof options === 'function') {
+    done = options;
+    options = {};
+  }
+  var ext = path.extname(fp);
+  var fns = this.cache[ext.slice(1)];
+  if (!fns) return current.then(function () { return fp; });
+
+  return Promise.reduce(fns, function (acc, fn) {
+    return fn(acc, options);
+  }, fp);
 };
