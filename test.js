@@ -74,3 +74,74 @@ describe('loaders', function () {
     loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 });
+
+describe('loaders async', function () {
+  beforeEach(function() {
+    loaders = new Loaders();
+
+    loaders.registerAsync('yaml', function yaml(str, options, next) {
+      next(null, YAML.safeLoad(str));
+    });
+
+    loaders.registerAsync('yml', function yml(str, options, next) {
+      next(null, YAML.safeLoad(str));
+    });
+
+    loaders.registerAsync('json', function json(fp, options, next) {
+      next(null, require(path.resolve(fp)));
+    });
+
+    loaders.registerAsync('read', function read(fp, options, next) {
+      fs.readFile(fp, 'utf8', next);
+    });
+
+    loaders.registerAsync('hbs', function hbs(fp, options, next) {
+      fs.readFile(fp, 'utf8', next);
+    });
+
+    loaders.registerAsync('data', function data(obj, options, next) {
+      obj.e = 'f';
+      next(null, obj);
+    });
+  });
+
+  it('should register async loaders:', function () {
+    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
+  });
+
+  it('should compose an async loader from other async loaders with the `.compose()` method:', function () {
+    loaders.compose('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
+  });
+
+  it('should compose an async loader from other async loaders with the `.register()` method:', function () {
+    loaders.registerAsync('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
+  });
+
+  it('should pass the value returned from an async loader to the next async loader:', function (done) {
+    loaders.registerAsync('bar', ['read', 'yaml', 'data']);
+    loaders.loadAsync('fixtures/a.bar', function (err, obj) {
+      obj.should.eql({c: 'd', e: 'f'});
+      done();
+    });
+  });
+
+  it('should pass the value returned from an async loader to the next async loader:', function (done) {
+    loaders.compose('bar', ['read', 'yaml', 'data']);
+    loaders.loadAsync('fixtures/a.bar', function (err, obj) {
+      obj.should.eql({c: 'd', e: 'f'});
+      done();
+    });
+  });
+
+  it('should compose an async loader from other async loaders:', function (done) {
+    loaders.compose('parse', ['read', 'yaml']);
+    loaders.compose('extend', ['data']);
+    loaders.compose('bar', ['parse', 'extend']);
+    loaders.loadAsync('fixtures/a.bar', function (err, obj) {
+      obj.should.eql({c: 'd', e: 'f'});
+      done();
+    });
+  });
+});
