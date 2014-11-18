@@ -164,7 +164,21 @@ loaders.registerStream('read', function(fp) {
 loaders.registerStream('yml', ['read', 'yaml']);
 ```
 
-### [.load](index.js#L272)
+### [.validate](index.js#L271)
+
+Validate loaders associated with a given laoder type.
+
+* `type` **{String}**: Type of loader to check for.    
+* `fns` **{Array}**: Loader functions to validate    
+* `returns`: {Boolean}  
+
+**Example**
+
+```js
+var valid = loaders.validate('async', fns);
+```
+
+### [.load](index.js#L296)
 
 Run loaders associated with `ext` of the given filepath.
 
@@ -179,7 +193,7 @@ Run loaders associated with `ext` of the given filepath.
 loaders.load('config.yml');
 ```
 
-### [.loadAsync](index.js#L300)
+### [.loadAsync](index.js#L324)
 
 Run async loaders associated with `ext` of the given filepath.
 
@@ -196,7 +210,7 @@ loaders.loadAsync('config.yml', function (err, obj) {
 });
 ```
 
-### [.loadPromise](index.js#L331)
+### [.loadPromise](index.js#L356)
 
 Run promise loaders associated with `ext` of the given filepath.
 
@@ -212,7 +226,7 @@ loaders.loadPromise('config.yml').then(function (results) {
 });
 ```
 
-### [.loadStream](index.js#L360)
+### [.loadStream](index.js#L386)
 
 Run stream loaders associated with `ext` of the given filepath.
 

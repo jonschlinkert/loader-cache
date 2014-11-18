@@ -254,6 +254,30 @@ Loaders.prototype.compose = function(ext, loaders) {
 };
 
 /**
+ * Validate loaders associated with a given laoder type.
+ *
+ * **Example**
+ *
+ * ```js
+ * var valid = loaders.validate('async', fns);
+ * ```
+ *
+ * @param {String} `type` Type of loader to check for.
+ * @param {Array} `fns` Loader functions to validate
+ * @return {Boolean}
+ * @api public
+ */
+
+Loaders.prototype.validate = function(type, fns) {
+  fns.forEach(function (fn) {
+    if (!fn[type]) {
+      throw new Error('Invalid loader type for ' + (fn.name == undefined ? 'annoyomous' : fn.name) + '. Expected ' + type);
+    }
+  });
+  return true;
+};
+
+/**
  * Run loaders associated with `ext` of the given filepath.
  *
  * **Example**
@@ -306,6 +330,7 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
   var fns = this.cache[ext.slice(1)];
   if (!fns) return fp;
 
+  this.validate('async', fns);
   async.reduce(fns, fp, function (acc, fn, next) {
     fn(acc, options, next);
   }, done);
@@ -335,6 +360,7 @@ Loaders.prototype.loadPromise = function(fp, options) {
   var fns = this.cache[ext.slice(1)];
   if (!fns) return current.then(function () { return fp; });
 
+  this.validate('promise', fns);
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
   }, fp);
@@ -361,10 +387,15 @@ Loaders.prototype.loadStream = function(fp, options) {
   options = options || {};
   var ext = path.extname(fp);
   var fns = this.cache[ext.slice(1)];
-  if (!fns) return fns = [es.through(function (fp) { 
-    this.emit('data', fp);
-  })];
+  if (!fns) {
+    var noop = es.through(function (fp) { 
+      this.emit('data', fp);
+    });
+    noop.stream = true;
+    fns = [noop];
+  }
 
+  this.validate('stream', fns);
   var stream = es.pipe.apply(es, fns);
   process.nextTick(function () {
     stream.write(fp);
