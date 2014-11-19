@@ -31,6 +31,19 @@ function Loaders() {
   this.cache = {};
 }
 
+Loaders.prototype._register = function(ext, fn, type) {
+  ext = (ext[0] === '.') ? ext.slice(1) : ext;
+
+  if (Array.isArray(fn)) {
+    return this.compose(ext, fn, type);
+  }
+
+  fn.type = type;
+  this.cache[type] = this.cache[type] || {};
+  this.cache[type][ext] = [fn];
+  return this;
+};
+
 /**
  * Register the given loader callback `fn` as `ext`. Any arbitrary
  * name can be assigned to a loader, however, the loader will only be
@@ -62,14 +75,7 @@ function Loaders() {
  */
 
 Loaders.prototype.register = function(ext, fn) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn);
-  }
-
-  this.cache[ext] = [fn];
-  return this;
+  this._register(ext, fn, 'sync');
 };
 
 /**
@@ -103,15 +109,7 @@ Loaders.prototype.register = function(ext, fn) {
  */
 
 Loaders.prototype.registerAsync = function(ext, fn) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn);
-  }
-
-  fn.async = true;
-  this.cache[ext] = [fn];
-  return this;
+  this._register(ext, fn, 'async');
 };
 
 /**
@@ -155,15 +153,7 @@ Loaders.prototype.registerAsync = function(ext, fn) {
  */
 
 Loaders.prototype.registerPromise = function(ext, fn) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn);
-  }
-
-  fn.promise = true;
-  this.cache[ext] = [fn];
-  return this;
+  this._register(ext, fn, 'promise');
 };
 
 /**
@@ -199,15 +189,7 @@ Loaders.prototype.registerPromise = function(ext, fn) {
  */
 
 Loaders.prototype.registerStream = function(ext, fn) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn);
-  }
-
-  fn.stream = true;
-  this.cache[ext] = [fn];
-  return this;
+  this._register(ext, fn, 'stream');
 };
 
 /**
@@ -241,10 +223,13 @@ Loaders.prototype.registerStream = function(ext, fn) {
  * @api private
  */
 
-Loaders.prototype.compose = function(ext, loaders) {
+Loaders.prototype.compose = function(ext, loaders, type) {
+  type = type || 'sync';
+
   loaders.reduce(function(stack, loader) {
-    stack[ext] = stack[ext] || [];
-    stack[ext] = stack[ext].concat(this.cache[loader]);
+    stack[type] = stack[type] || {};
+    stack[type][ext] = stack[type][ext] || [];
+    stack[type][ext] = stack[type][ext].concat(this.cache[type][loader]);
     return stack;
   }.bind(this), this.cache);
   return this;
@@ -388,7 +373,7 @@ Loaders.prototype.loadStream = function(fp, options) {
   var ext = path.extname(fp);
   var fns = this.cache[ext.slice(1)];
   if (!fns) {
-    var noop = es.through(function (fp) { 
+    var noop = es.through(function (fp) {
       this.emit('data', fp);
     });
     noop.stream = true;
