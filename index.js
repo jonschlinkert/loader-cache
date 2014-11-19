@@ -31,8 +31,18 @@ function Loaders() {
   this.cache = {};
 }
 
+/**
+ * Base register method used by all other register method.
+ *
+ * @param {String} `ext`
+ * @param {Function} `fn`
+ * @param {String} `type`
+ * @return {String}
+ * @api private
+ */
+
 Loaders.prototype._register = function(ext, fn, type) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
+  ext = formatExt(ext);
 
   if (Array.isArray(fn)) {
     return this.compose(ext, fn, type);
@@ -232,31 +242,8 @@ Loaders.prototype.compose = function(ext, loaders, type) {
     stack[type][ext] = stack[type][ext].concat(this.cache[type][loader]);
     return stack;
   }.bind(this), this.cache);
+
   return this;
-};
-
-/**
- * Validate loaders associated with a given loader type.
- *
- * **Example**
- *
- * ```js
- * var valid = loaders.validate('async', fns);
- * ```
- *
- * @param {String} `type` Type of loader to check for.
- * @param {Array} `fns` Loader functions to validate
- * @return {Boolean}
- * @api public
- */
-
-Loaders.prototype.validate = function(type, fns) {
-  fns.forEach(function (fn) {
-    if (!fn[type]) {
-      throw new Error('Invalid loader type for ' + (fn.name == undefined ? 'anonymous' : fn.name) + '. Expected ' + type);
-    }
-  });
-  return true;
 };
 
 /**
@@ -277,7 +264,7 @@ Loaders.prototype.validate = function(type, fns) {
 
 Loaders.prototype.load = function(fp, options) {
   var ext = path.extname(fp);
-  var fns = this.cache[ext.slice(1)];
+  var fns = this.cache.sync[formatExt(ext)];
   if (!fns) return fp;
 
   return fns.reduce(function (acc, fn) {
@@ -310,10 +297,9 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
     options = {};
   }
   var ext = path.extname(fp);
-  var fns = this.cache[ext.slice(1)];
+  var fns = this.cache.async[formatExt(ext)];
   if (!fns) return fp;
 
-  this.validate('async', fns);
   async.reduce(fns, fp, function (acc, fn, next) {
     fn(acc, options, next);
   }, done);
@@ -341,10 +327,10 @@ Loaders.prototype.loadPromise = function(fp, options) {
   var current = Promise.resolve();
   options = options || {};
   var ext = path.extname(fp);
-  var fns = this.cache[ext.slice(1)];
+  var fns = this.cache.promise[formatExt(ext)];
   if (!fns) return current.then(function () { return fp; });
 
-  this.validate('promise', fns);
+
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
   }, fp);
@@ -371,7 +357,7 @@ Loaders.prototype.loadStream = function(fp, options) {
   var es = require('event-stream');
   options = options || {};
   var ext = path.extname(fp);
-  var fns = this.cache[ext.slice(1)];
+  var fns = this.cache.stream[formatExt(ext)];
   if (!fns) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
@@ -380,7 +366,6 @@ Loaders.prototype.loadStream = function(fp, options) {
     fns = [noop];
   }
 
-  this.validate('stream', fns);
   var stream = es.pipe.apply(es, fns);
   process.nextTick(function () {
     stream.write(fp);
@@ -388,3 +373,11 @@ Loaders.prototype.loadStream = function(fp, options) {
   });
   return stream;
 };
+
+
+
+function formatExt(ext) {
+  return (ext[0] === '.')
+    ? ext.slice(1)
+    : ext;
+}
