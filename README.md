@@ -52,7 +52,7 @@ var Loader = require('loader');
 var loader = new Loader();
 ```
 
-### [.register](index.js#L64)
+### [register](index.js#L87)
 
 Register the given loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -77,7 +77,7 @@ loaders.register('read', function(fp) {
 loaders.register('yml', ['read', 'yaml']);
 ```
 
-### [.registerAsync](index.js#L105)
+### [registerAsync](index.js#L121)
 
 Register the given async loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -102,7 +102,7 @@ loaders.registerAsync('read', function(fp, next) {
 loaders.registerAsync('yml', ['read', 'yaml']);
 ```
 
-### [.registerPromise](index.js#L157)
+### [registerPromise](index.js#L165)
 
 Register the given promise loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -137,7 +137,7 @@ loaders.registerPromise('read', function(fp) {
 loaders.registerPromise('yml', ['read', 'yaml']);
 ```
 
-### [.registerStream](index.js#L201)
+### [registerStream](index.js#L201)
 
 Register the given stream loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -164,21 +164,7 @@ loaders.registerStream('read', function(fp) {
 loaders.registerStream('yml', ['read', 'yaml']);
 ```
 
-### [.validate](index.js#L268)
-
-Validate loaders associated with a given loader type.
-
-* `type` **{String}**: Type of loader to check for.    
-* `fns` **{Array}**: Loader functions to validate    
-* `returns`: {Boolean}  
-
-**Example**
-
-```js
-var valid = loaders.validate('async', fns);
-```
-
-### [.load](index.js#L293)
+### [load](index.js#L265)
 
 Run loaders associated with `ext` of the given filepath.
 
@@ -193,7 +179,7 @@ Run loaders associated with `ext` of the given filepath.
 loaders.load('config.yml');
 ```
 
-### [.loadAsync](index.js#L321)
+### [loadAsync](index.js#L294)
 
 Run async loaders associated with `ext` of the given filepath.
 
@@ -207,10 +193,11 @@ Run async loaders associated with `ext` of the given filepath.
 ```js
 // this will run the `yml` async loader from the `.compose()` example
 loaders.loadAsync('config.yml', function (err, obj) {
+  // do some async stuff
 });
 ```
 
-### [.loadPromise](index.js#L354)
+### [loadPromise](index.js#L328)
 
 Run promise loaders associated with `ext` of the given filepath.
 
@@ -222,11 +209,13 @@ Run promise loaders associated with `ext` of the given filepath.
 
 ```js
 // this will run the `yml` promise loader from the `.compose()` example
-loaders.loadPromise('config.yml').then(function (results) {
-});
+loaders.loadPromise('config.yml')
+  .then(function (results) {
+    // do some promise stuff
+  });
 ```
 
-### [.loadStream](index.js#L385)
+### [loadStream](index.js#L362)
 
 Run stream loaders associated with `ext` of the given filepath.
 
@@ -238,8 +227,11 @@ Run stream loaders associated with `ext` of the given filepath.
 
 ```js
 // this will run the `yml` stream loader from the `.compose()` example
-loaders.LoadStream('config.yml').on('data', function (results) {
-});
+loaders.LoadStream('config.yml')
+  .pipe(foo())
+  .on('data', function (results) {
+    // do stuff
+  });
 ```
 
 

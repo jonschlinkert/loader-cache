@@ -280,6 +280,7 @@ Loaders.prototype.load = function(fp, options) {
  * ```js
  * // this will run the `yml` async loader from the `.compose()` example
  * loaders.loadAsync('config.yml', function (err, obj) {
+ *   // do some async stuff
  * });
  * ```
  *
@@ -312,8 +313,10 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
  *
  * ```js
  * // this will run the `yml` promise loader from the `.compose()` example
- * loaders.loadPromise('config.yml').then(function (results) {
- * });
+ * loaders.loadPromise('config.yml')
+ *   .then(function (results) {
+ *     // do some promise stuff
+ *   });
  * ```
  *
  * @param {String} `fp` File path to load.
@@ -343,8 +346,11 @@ Loaders.prototype.loadPromise = function(fp, options) {
  *
  * ```js
  * // this will run the `yml` stream loader from the `.compose()` example
- * loaders.LoadStream('config.yml').on('data', function (results) {
- * });
+ * loaders.LoadStream('config.yml')
+ *   .pipe(foo())
+ *   .on('data', function (results) {
+ *     // do stuff
+ *   });
  * ```
  *
  * @param {String} `fp` File path to load.
@@ -374,7 +380,13 @@ Loaders.prototype.loadStream = function(fp, options) {
   return stream;
 };
 
-
+/**
+ * Format extensions.
+ *
+ * @param {String} `ext`
+ * @return {String}
+ * @api private
+ */
 
 function formatExt(ext) {
   return (ext[0] === '.')
