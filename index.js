@@ -7,9 +7,6 @@
 
 'use strict';
 
-var Promise = require('bluebird');
-var es = require('event-stream');
-var async = require('async');
 var path = require('path');
 
 /**
@@ -33,6 +30,29 @@ module.exports = Loaders;
 function Loaders() {
   this.cache = {};
 }
+
+/**
+ * Base register method used by all other register method.
+ *
+ * @param {String} `ext`
+ * @param {Function} `fn`
+ * @param {String} `type`
+ * @return {String}
+ * @api private
+ */
+
+Loaders.prototype._register = function(ext, fn, type) {
+  ext = formatExt(ext);
+
+  if (Array.isArray(fn)) {
+    return this.compose(ext, fn, type);
+  }
+
+  fn.type = type;
+  this.cache[type] = this.cache[type] || {};
+  this.cache[type][ext] = [fn];
+  return this;
+};
 
 /**
  * Register the given loader callback `fn` as `ext`. Any arbitrary
@@ -65,14 +85,7 @@ function Loaders() {
  */
 
 Loaders.prototype.register = function(ext, fn) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn);
-  }
-
-  this.cache[ext] = [fn];
-  return this;
+  this._register(ext, fn, 'sync');
 };
 
 /**
@@ -106,15 +119,7 @@ Loaders.prototype.register = function(ext, fn) {
  */
 
 Loaders.prototype.registerAsync = function(ext, fn) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn);
-  }
-
-  fn.async = true;
-  this.cache[ext] = [fn];
-  return this;
+  this._register(ext, fn, 'async');
 };
 
 /**
@@ -158,15 +163,7 @@ Loaders.prototype.registerAsync = function(ext, fn) {
  */
 
 Loaders.prototype.registerPromise = function(ext, fn) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn);
-  }
-
-  fn.promise = true;
-  this.cache[ext] = [fn];
-  return this;
+  this._register(ext, fn, 'promise');
 };
 
 /**
@@ -202,15 +199,7 @@ Loaders.prototype.registerPromise = function(ext, fn) {
  */
 
 Loaders.prototype.registerStream = function(ext, fn) {
-  ext = (ext[0] === '.') ? ext.slice(1) : ext;
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn);
-  }
-
-  fn.stream = true;
-  this.cache[ext] = [fn];
-  return this;
+  this._register(ext, fn, 'stream');
 };
 
 /**
@@ -244,12 +233,16 @@ Loaders.prototype.registerStream = function(ext, fn) {
  * @api private
  */
 
-Loaders.prototype.compose = function(ext, loaders) {
+Loaders.prototype.compose = function(ext, loaders, type) {
+  type = type || 'sync';
+
   loaders.reduce(function(stack, loader) {
-    stack[ext] = stack[ext] || [];
-    stack[ext] = stack[ext].concat(this.cache[loader]);
+    stack[type] = stack[type] || {};
+    stack[type][ext] = stack[type][ext] || [];
+    stack[type][ext] = stack[type][ext].concat(this.cache[type][loader]);
     return stack;
   }.bind(this), this.cache);
+
   return this;
 };
 
@@ -271,7 +264,7 @@ Loaders.prototype.compose = function(ext, loaders) {
 
 Loaders.prototype.load = function(fp, options) {
   var ext = path.extname(fp);
-  var fns = this.cache[ext.slice(1)];
+  var fns = this.cache.sync[formatExt(ext)];
   if (!fns) return fp;
 
   return fns.reduce(function (acc, fn) {
@@ -298,12 +291,13 @@ Loaders.prototype.load = function(fp, options) {
  */
 
 Loaders.prototype.loadAsync = function(fp, options, done) {
+  var async = require('async');
   if (typeof options === 'function') {
     done = options;
     options = {};
   }
   var ext = path.extname(fp);
-  var fns = this.cache[ext.slice(1)];
+  var fns = this.cache.async[formatExt(ext)];
   if (!fns) return fp;
 
   async.reduce(fns, fp, function (acc, fn, next) {
@@ -329,11 +323,13 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
  */
 
 Loaders.prototype.loadPromise = function(fp, options) {
+  var Promise = require('bluebird');
   var current = Promise.resolve();
   options = options || {};
   var ext = path.extname(fp);
-  var fns = this.cache[ext.slice(1)];
+  var fns = this.cache.promise[formatExt(ext)];
   if (!fns) return current.then(function () { return fp; });
+
 
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
@@ -353,17 +349,22 @@ Loaders.prototype.loadPromise = function(fp, options) {
  *
  * @param {String} `fp` File path to load.
  * @param {Object} `options` Options to pass to whatever loaders are defined.
- * @return {Promise} a stream that will be fulfilled later
+ * @return {Stream} a stream that will be fulfilled later
  * @api public
  */
 
 Loaders.prototype.loadStream = function(fp, options) {
+  var es = require('event-stream');
   options = options || {};
   var ext = path.extname(fp);
-  var fns = this.cache[ext.slice(1)];
-  if (!fns) return fns = [es.through(function (fp) { 
-    this.emit('data', fp);
-  })];
+  var fns = this.cache.stream[formatExt(ext)];
+  if (!fns) {
+    var noop = es.through(function (fp) {
+      this.emit('data', fp);
+    });
+    noop.stream = true;
+    fns = [noop];
+  }
 
   var stream = es.pipe.apply(es, fns);
   process.nextTick(function () {
@@ -372,3 +373,11 @@ Loaders.prototype.loadStream = function(fp, options) {
   });
   return stream;
 };
+
+
+
+function formatExt(ext) {
+  return (ext[0] === '.')
+    ? ext.slice(1)
+    : ext;
+}
