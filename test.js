@@ -7,6 +7,7 @@
 
 'use strict';
 
+var path = require('path');
 var Promise = require('bluebird');
 var es = require('event-stream');
 var should = require('should');
@@ -75,6 +76,17 @@ describe('loaders (sync)', function () {
     loaders.compose('extend', ['data']);
     loaders.compose('bar', ['parse', 'extend']);
     loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+  });
+
+  it('should use a custom function for matching loaders:', function () {
+    loaders.compose('parse', ['read', 'yaml']);
+    loaders.compose('extend', ['data']);
+    loaders.compose('bar', ['parse', 'extend']);
+    loaders.load('fixtures/a.bar', {
+      matchLoader: function(pattern) {
+        return path.extname(pattern).slice(1);
+      }
+    }).should.eql({c: 'd', e: 'f'});
   });
 });
 

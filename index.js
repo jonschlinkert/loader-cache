@@ -84,8 +84,8 @@ Loaders.prototype._register = function(ext, fn, type) {
  * @api public
  */
 
-Loaders.prototype.register = function(ext, fn) {
-  this._register(ext, fn, 'sync');
+Loaders.prototype.register = function(ext, fn, type) {
+  this._register(ext, fn, type || 'sync');
 };
 
 /**
@@ -263,8 +263,7 @@ Loaders.prototype.compose = function(ext, loaders, type) {
  */
 
 Loaders.prototype.load = function(fp, options) {
-  var ext = path.extname(fp);
-  var fns = this.cache.sync[formatExt(ext)];
+  var fns = this.cache.sync[matchLoader(fp, options, this)];
   if (!fns) return fp;
 
   return fns.reduce(function (acc, fn) {
@@ -297,8 +296,8 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
     done = options;
     options = {};
   }
-  var ext = path.extname(fp);
-  var fns = this.cache.async[formatExt(ext)];
+
+  var fns = this.cache.async[matchLoader(fp, options, this)];
   if (!fns) return fp;
 
   async.reduce(fns, fp, function (acc, fn, next) {
@@ -329,10 +328,9 @@ Loaders.prototype.loadPromise = function(fp, options) {
   var Promise = require('bluebird');
   var current = Promise.resolve();
   options = options || {};
-  var ext = path.extname(fp);
-  var fns = this.cache.promise[formatExt(ext)];
-  if (!fns) return current.then(function () { return fp; });
 
+  var fns = this.cache.promise[matchLoader(fp, options, this)];
+  if (!fns) return current.then(function () { return fp; });
 
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
@@ -362,8 +360,8 @@ Loaders.prototype.loadPromise = function(fp, options) {
 Loaders.prototype.loadStream = function(fp, options) {
   var es = require('event-stream');
   options = options || {};
-  var ext = path.extname(fp);
-  var fns = this.cache.stream[formatExt(ext)];
+
+  var fns = this.cache.stream[matchLoader(fp, options, this)];
   if (!fns) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
@@ -379,6 +377,21 @@ Loaders.prototype.loadStream = function(fp, options) {
   });
   return stream;
 };
+
+/**
+ * Get a loader based on the given pattern.
+ *
+ * @param {String} `pattern` By default, this is assumed to be a filepath.
+ * @return {Object} Object
+ * @api private
+ */
+
+function matchLoader(pattern, options, thisArg) {
+  if (options && options.matchLoader) {
+    return options.matchLoader(pattern, options, thisArg);
+  }
+  return formatExt(path.extname(pattern));
+}
 
 /**
  * Format extensions.
