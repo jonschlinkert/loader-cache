@@ -16,14 +16,14 @@ var path = require('path');
 module.exports = Loaders;
 
 /**
- * Create a new instance of `Loader`
+ * Create a new instance of `Loaders`
  *
  * ```js
- * var Loader = require('loader');
- * var loader = new Loader();
+ * var Loaders = require('loader-cache');
+ * var loaders = new Loaders();
  * ```
  *
- * @class `Loader`
+ * @class `Loaders`
  * @api public
  */
 
