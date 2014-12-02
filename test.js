@@ -83,6 +83,11 @@ describe('loaders (sync)', function () {
       loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
     });
 
+    it('should extend a loader stack with loaders defined on the load method:', function () {
+      loaders.register('bar', ['read', 'yaml']);
+      loaders.load('fixtures/a.bar', ['data']).should.eql({c: 'd', e: 'f'});
+    });
+
     it('should use a custom function for matching loaders:', function () {
       loaders.compose('parse', ['read', 'yaml']);
       loaders.compose('extend', ['data']);
@@ -155,6 +160,14 @@ describe('loaders (async)', function () {
     it('should pass the value returned from an async loader to the next async loader:', function (done) {
       loaders.compose('bar', ['read', 'yaml', 'data'], 'async');
       loaders.loadAsync('fixtures/a.bar', function (err, obj) {
+        obj.should.eql({c: 'd', e: 'f'});
+        done();
+      });
+    });
+
+    it('should extend a loader stack with loaders defined on the loadAsync method:', function (done) {
+      loaders.compose('bar', ['read', 'yaml'], 'async');
+      loaders.loadAsync('fixtures/a.bar', ['data'], function (err, obj) {
         obj.should.eql({c: 'd', e: 'f'});
         done();
       });
@@ -235,6 +248,14 @@ describe('loaders (promise)', function () {
       });
     });
 
+    it('should extend a loader stack with loaders defined on the loadPromise method:', function (done) {
+      loaders.compose('bar', ['read', 'yaml'], 'promise');
+      loaders.loadPromise('fixtures/a.bar', ['data']).then(function (results) {
+        results.should.eql({c: 'd', e: 'f'});
+        done();
+      });
+    });
+
     it('should compose a promise loader from other promise loaders:', function (done) {
       loaders.compose('parse', ['read', 'yaml'], 'promise');
       loaders.compose('extend', ['data'], 'promise');
@@ -305,6 +326,13 @@ describe('loaders (stream)', function () {
     it('should pass the value returned from a stream loader to the next stream loader:', function (done) {
       loaders.compose('bar', ['read', 'yaml', 'data'], 'stream');
       loaders.loadStream('fixtures/a.bar').on('data', function (results) {
+        results.should.eql({c: 'd', e: 'f'});
+      }).on('end', done);
+    });
+
+    it('should extend a loader stack with loaders defined on the loadStream method:', function (done) {
+      loaders.compose('bar', ['read', 'yaml'], 'stream');
+      loaders.loadStream('fixtures/a.bar', ['data']).on('data', function (results) {
         results.should.eql({c: 'd', e: 'f'});
       }).on('end', done);
     });

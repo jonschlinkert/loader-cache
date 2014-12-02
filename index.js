@@ -203,6 +203,24 @@ Loaders.prototype.registerStream = function(ext, fn) {
 };
 
 /**
+ * Create a loader stack of the given `type` from an
+ * array of `loaders`.
+ *
+ * @param {Array} `loaders` Names of stored loaders to add to the stack.
+ * @param {String} `type=sync`
+ * @return {Array} Array of loaders
+ * @api public
+ */
+
+Loaders.prototype.createStack = function(loaders, type) {
+  var cache = this.cache[type || 'sync'];
+
+  return (loaders || []).reduce(function(stack, name) {
+    return stack.concat(cache[name]);
+  }.bind(this), []);
+};
+
+/**
  * Create a loader from other (previously cached) loaders. For
  * example, you might create a loader like the following:
  *
@@ -236,15 +254,14 @@ Loaders.prototype.registerStream = function(ext, fn) {
 Loaders.prototype.compose = function(ext, loaders, type) {
   type = type || 'sync';
 
-  loaders.reduce(function(stack, loader) {
-    stack[type] = stack[type] || {};
-    stack[type][ext] = stack[type][ext] || [];
-    stack[type][ext] = stack[type][ext].concat(this.cache[type][loader]);
-    return stack;
-  }.bind(this), this.cache);
+  var cache = this.cache[type] || {};
+  var stack = this.createStack(loaders, type);
 
+  cache[ext] = cache[ext] || [];
+  cache[ext] = cache[ext].concat(stack);
   return this;
 };
+
 
 /**
  * Run loaders associated with `ext` of the given filepath.
@@ -262,9 +279,18 @@ Loaders.prototype.compose = function(ext, loaders, type) {
  * @api public
  */
 
-Loaders.prototype.load = function(fp, options) {
-  var fns = this.cache.sync[matchLoader(fp, options, this)];
-  if (!fns) return fp;
+Loaders.prototype.load = function(fp, options, stack) {
+  if (Array.isArray(options)) {
+    stack = options;
+    options = {};
+  }
+
+  var loader = matchLoader(fp, options, this);
+  var local = this.createStack(stack);
+  var fns = this.cache.sync[loader].concat(local);
+  if (!fns) {
+    return fp;
+  }
 
   return fns.reduce(function (acc, fn) {
     return fn(acc, options);
@@ -290,16 +316,25 @@ Loaders.prototype.load = function(fp, options) {
  * @api public
  */
 
-Loaders.prototype.loadAsync = function(fp, options, done) {
-  var async = require('async');
+Loaders.prototype.loadAsync = function(fp, options, stack, done) {
+  if (Array.isArray(options)) {
+    done = stack;
+    stack = options;
+    options = {};
+  }
+
   if (typeof options === 'function') {
     done = options;
     options = {};
   }
 
-  var fns = this.cache.async[matchLoader(fp, options, this)];
+  var loader = matchLoader(fp, options, this);
+  var local = this.createStack(stack, 'async');
+  var fns = this.cache.async[loader].concat(local);
+
   if (!fns) return fp;
 
+  var async = require('async');
   async.reduce(fns, fp, function (acc, fn, next) {
     fn(acc, options, next);
   }, done);
@@ -324,12 +359,20 @@ Loaders.prototype.loadAsync = function(fp, options, done) {
  * @api public
  */
 
-Loaders.prototype.loadPromise = function(fp, options) {
+Loaders.prototype.loadPromise = function(fp, options, stack) {
+  if (Array.isArray(options)) {
+    stack = options;
+    options = {};
+  }
+
   var Promise = require('bluebird');
   var current = Promise.resolve();
   options = options || {};
 
-  var fns = this.cache.promise[matchLoader(fp, options, this)];
+  var loader = matchLoader(fp, options, this);
+  var local = this.createStack(stack, 'promise');
+  var fns = this.cache.promise[loader].concat(local);
+
   if (!fns) return current.then(function () { return fp; });
 
   return Promise.reduce(fns, function (acc, fn) {
@@ -357,11 +400,19 @@ Loaders.prototype.loadPromise = function(fp, options) {
  * @api public
  */
 
-Loaders.prototype.loadStream = function(fp, options) {
+Loaders.prototype.loadStream = function(fp, options, stack) {
+  if (Array.isArray(options)) {
+    stack = options;
+    options = {};
+  }
+
   var es = require('event-stream');
   options = options || {};
 
-  var fns = this.cache.stream[matchLoader(fp, options, this)];
+  var loader = matchLoader(fp, options, this);
+  var local = this.createStack(stack, 'stream');
+  var fns = this.cache.stream[loader].concat(local);
+
   if (!fns) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
