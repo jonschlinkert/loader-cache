@@ -220,6 +220,24 @@ Loaders.prototype.createStack = function(loaders, type) {
 };
 
 /**
+ * Private method for loading a stack of loaders that is
+ * a combination of both stored loaders and locally defined
+ * loaders.
+ *
+ * @param {Array} `loaders` Names of stored loaders to add to the stack.
+ * @param {String} `type=sync`
+ * @return {Array} Array of loaders
+ * @api public
+ */
+
+Loaders.prototype.loadStack = function(fp, opts, stack, type) {
+  var loader = matchLoader(fp, opts, this);
+  stack = [loader].concat(stack);
+
+  return this.createStack(stack, type);
+};
+
+/**
  * Create a loader from other (previously cached) loaders. For
  * example, you might create a loader like the following:
  *
@@ -284,8 +302,7 @@ Loaders.prototype.load = function(fp, options, stack) {
     options = {};
   }
 
-  var loader = matchLoader(fp, options, this);
-  var fns = this.createStack([loader].concat(stack));
+  var fns = this.loadStack(fp, options, stack);
   if (!fns) {
     return fp;
   }
@@ -326,8 +343,7 @@ Loaders.prototype.loadAsync = function(fp, options, stack, done) {
     options = {};
   }
 
-  var loader = matchLoader(fp, options, this);
-  var fns = this.createStack([loader].concat(stack), 'async');
+  var fns = this.loadStack(fp, options, stack, 'async');
   if (!fns) {
     return fp;
   }
@@ -365,9 +381,7 @@ Loaders.prototype.loadPromise = function(fp, options, stack) {
 
   options = options || {};
 
-  var loader = matchLoader(fp, options, this);
-  var fns = this.createStack([loader].concat(stack), 'promise');
-
+  var fns = this.loadStack(fp, options, stack, 'promise');
   var Promise = require('bluebird');
   var current = Promise.resolve();
 
@@ -406,9 +420,7 @@ Loaders.prototype.loadStream = function(fp, options, stack) {
   var es = require('event-stream');
   options = options || {};
 
-  var loader = matchLoader(fp, options, this);
-  var fns = this.createStack([loader].concat(stack), 'stream');
-
+  var fns = this.loadStack(fp, options, stack, 'stream');
   if (!fns) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
