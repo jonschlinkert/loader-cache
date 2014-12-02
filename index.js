@@ -232,8 +232,7 @@ Loaders.prototype.createStack = function(loaders, type) {
 
 Loaders.prototype.loadStack = function(fp, opts, stack, type) {
   var loader = matchLoader(fp, opts, this);
-  stack = [loader].concat(stack);
-
+  stack = [loader].concat(stack || []);
   return this.createStack(stack, type);
 };
 
@@ -303,7 +302,7 @@ Loaders.prototype.load = function(fp, options, stack) {
   }
 
   var fns = this.loadStack(fp, options, stack);
-  if (!fns) {
+  if (!fns || fns.length === 0) {
     return fp;
   }
 
@@ -338,13 +337,19 @@ Loaders.prototype.loadAsync = function(fp, options, stack, done) {
     options = {};
   }
 
+  if (typeof stack === 'function') {
+    done = stack;
+    stack = [];
+  }
+
   if (typeof options === 'function') {
     done = options;
     options = {};
+    stack = [];
   }
 
   var fns = this.loadStack(fp, options, stack, 'async');
-  if (!fns) {
+  if (!fns || fns.length === 0) {
     return fp;
   }
 
@@ -385,7 +390,7 @@ Loaders.prototype.loadPromise = function(fp, options, stack) {
   var Promise = require('bluebird');
   var current = Promise.resolve();
 
-  if (!fns) return current.then(function () { return fp; });
+  if (!fns || fns.length === 0) return current.then(function () { return fp; });
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
   }, fp);
@@ -421,7 +426,7 @@ Loaders.prototype.loadStream = function(fp, options, stack) {
   options = options || {};
 
   var fns = this.loadStack(fp, options, stack, 'stream');
-  if (!fns) {
+  if (!fns || fns.length === 0) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
     });
