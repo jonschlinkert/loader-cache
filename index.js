@@ -214,10 +214,9 @@ Loaders.prototype.registerStream = function(ext, fn) {
 
 Loaders.prototype.createStack = function(loaders, type) {
   var cache = this.cache[type || 'sync'];
-
   return (loaders || []).reduce(function(stack, name) {
     return stack.concat(cache[name]);
-  }.bind(this), []);
+  }.bind(this), []).filter(Boolean);
 };
 
 /**
@@ -286,8 +285,7 @@ Loaders.prototype.load = function(fp, options, stack) {
   }
 
   var loader = matchLoader(fp, options, this);
-  var local = this.createStack(stack);
-  var fns = this.cache.sync[loader].concat(local);
+  var fns = this.createStack([loader].concat(stack));
   if (!fns) {
     return fp;
   }
@@ -329,10 +327,10 @@ Loaders.prototype.loadAsync = function(fp, options, stack, done) {
   }
 
   var loader = matchLoader(fp, options, this);
-  var local = this.createStack(stack, 'async');
-  var fns = this.cache.async[loader].concat(local);
-
-  if (!fns) return fp;
+  var fns = this.createStack([loader].concat(stack), 'async');
+  if (!fns) {
+    return fp;
+  }
 
   var async = require('async');
   async.reduce(fns, fp, function (acc, fn, next) {
@@ -365,16 +363,15 @@ Loaders.prototype.loadPromise = function(fp, options, stack) {
     options = {};
   }
 
-  var Promise = require('bluebird');
-  var current = Promise.resolve();
   options = options || {};
 
   var loader = matchLoader(fp, options, this);
-  var local = this.createStack(stack, 'promise');
-  var fns = this.cache.promise[loader].concat(local);
+  var fns = this.createStack([loader].concat(stack), 'promise');
+
+  var Promise = require('bluebird');
+  var current = Promise.resolve();
 
   if (!fns) return current.then(function () { return fp; });
-
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
   }, fp);
@@ -410,8 +407,7 @@ Loaders.prototype.loadStream = function(fp, options, stack) {
   options = options || {};
 
   var loader = matchLoader(fp, options, this);
-  var local = this.createStack(stack, 'stream');
-  var fns = this.cache.stream[loader].concat(local);
+  var fns = this.createStack([loader].concat(stack), 'stream');
 
   if (!fns) {
     var noop = es.through(function (fp) {
