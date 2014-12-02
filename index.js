@@ -227,7 +227,7 @@ Loaders.prototype.createStack = function(loaders, type) {
  * @param {Array} `loaders` Names of stored loaders to add to the stack.
  * @param {String} `type=sync`
  * @return {Array} Array of loaders
- * @api public
+ * @api private
  */
 
 Loaders.prototype.loadStack = function(fp, opts, stack, type) {
