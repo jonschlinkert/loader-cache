@@ -36,22 +36,19 @@ function Loaders() {
  *
  * @param {String} `ext`
  * @param {Function|Array} `fn`
- * @param {String|Array} `types`
+ * @param {String} `type`
  * @return {Object}
  * @api private
  */
 
-Loaders.prototype._register = function(ext, fn, types) {
+Loaders.prototype._register = function(ext, fn, type) {
   ext = formatExt(ext);
   if (Array.isArray(fn)) {
-    return this.compose(ext, fn, types);
+    return this.compose(ext, fn, type);
   }
-  if (Array.isArray(types)) {
-    types = types[0];
-  }
-  fn.type = types;
-  this.cache[types] = this.cache[types] || {};
-  this.cache[types][ext] = [fn];
+  fn.type = type;
+  this.cache[type] = this.cache[type] || {};
+  this.cache[type][ext] = [fn];
   return this;
 };
 
@@ -268,17 +265,14 @@ Loaders.prototype.loadStack = function(fp, opts, stack, type) {
  * @api private
  */
 
-Loaders.prototype.compose = function(ext, loaders, types) {
-  types = types || 'sync';
-  types = Array.isArray(types) ? types : [types];
+Loaders.prototype.compose = function(ext, loaders, type) {
+  type = type || 'sync';
 
-  types.forEach(function (type) {
-    var cache = this.cache[type] || {};
-    var stack = this.createStack(loaders, type);
+  var cache = this.cache[type] || {};
+  var stack = this.createStack(loaders, type);
 
-    cache[ext] = cache[ext] || [];
-    cache[ext] = cache[ext].concat(stack);
-  }, this);
+  cache[ext] = cache[ext] || [];
+  cache[ext] = cache[ext].concat(stack);
   return this;
 };
 

@@ -41,19 +41,6 @@ describe('register', function () {
       this.emit('data', fs.readFileSync(fp, 'utf8'));
     }));
   });
-
-  it('should add a child loader for all types', function () {
-    loaders._register('foo', ['read'], ['sync', 'async', 'promise', 'stream']);
-    loaders.cache.sync.should.have.properties('read', 'foo');
-    loaders.cache.async.should.have.properties('read', 'foo');
-    loaders.cache.promise.should.have.properties('read', 'foo');
-    loaders.cache.stream.should.have.properties('read', 'foo');
-
-    loaders.cache.sync.foo[0].type.should.eql('sync');
-    loaders.cache.async.foo[0].type.should.eql('async');
-    loaders.cache.promise.foo[0].type.should.eql('promise');
-    loaders.cache.stream.foo[0].type.should.eql('stream');
-  });
 });
 
 describe('loaders (sync)', function () {
