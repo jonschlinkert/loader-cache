@@ -150,9 +150,10 @@ Loaders.prototype.registerAsync = function(ext, fn) {
  * **Examples**
  *
  * ```js
+ * var Promise = require('bluebird');
+ *
  * // register an promise loader for parsing YAML
  * loaders.registerPromise('yaml', function(fp) {
- *    var Promise = require('bluebird');
  *    var deferred = Promise.pending();
  *    process.nextTick(function () {
  *      deferred.fulfill(YAML.safeLoad(fp));
