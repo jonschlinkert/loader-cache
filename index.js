@@ -35,32 +35,23 @@ function Loaders() {
  * Base register method used by all other register method.
  *
  * @param {String} `ext`
- * @param {Function} `fn`
- * @param {String|Object} `types`
+ * @param {Function|Array} `fn`
+ * @param {String|Array} `types`
  * @return {Object}
  * @api private
  */
 
 Loaders.prototype._register = function(ext, fn, types) {
   ext = formatExt(ext);
-  if (types && typeof types === 'string') {
-    var type = types;
-    types = {};
-    types[type] = true;
+  if (Array.isArray(fn)) {
+    return this.compose(ext, fn, types);
   }
-
-  forOwn(types, function (value, key) {
-    var type = pickLoader(key);
-    if (value && type) {
-      if (Array.isArray(fn)) {
-        return this.compose(ext, fn, type);
-      }
-
-      fn.type = type;
-      this.cache[type] = this.cache[type] || {};
-      this.cache[type][ext] = [fn];
-    }
-  }, this);
+  if (Array.isArray(types)) {
+    types = types[0];
+  }
+  fn.type = types;
+  this.cache[types] = this.cache[types] || {};
+  this.cache[types][ext] = [fn];
   return this;
 };
 
@@ -277,14 +268,17 @@ Loaders.prototype.loadStack = function(fp, opts, stack, type) {
  * @api private
  */
 
-Loaders.prototype.compose = function(ext, loaders, type) {
-  type = type || 'sync';
+Loaders.prototype.compose = function(ext, loaders, types) {
+  types = types || 'sync';
+  types = Array.isArray(types) ? types : [types];
 
-  var cache = this.cache[type] || {};
-  var stack = this.createStack(loaders, type);
+  types.forEach(function (type) {
+    var cache = this.cache[type] || {};
+    var stack = this.createStack(loaders, type);
 
-  cache[ext] = cache[ext] || [];
-  cache[ext] = cache[ext].concat(stack);
+    cache[ext] = cache[ext] || [];
+    cache[ext] = cache[ext].concat(stack);
+  }, this);
   return this;
 };
 
@@ -465,27 +459,6 @@ Loaders.loaderTypes = [
 ];
 
 /**
- * Determine if the string is a valid and supported loader type.
- * 
- * @param  {String} `str` string to validate
- * @return {String} validated string
- */
-
-function pickLoader(str) {
-  if (!str || typeof str !== 'string') return undefined;
-  var type;
-  var capital = /[A-Z]/.exec(str);
-  if (capital) {
-    var i = str.indexOf(capital);
-    type = str.slice(i).toLowerCase();
-  } else {
-    type = str;
-  }
-  if (Loaders.loaderTypes.indexOf(type) === -1) return undefined;
-  return type;
-}
-
-/**
  * Get a loader based on the given pattern.
  *
  * @param {String} `pattern` By default, this is assumed to be a filepath.
@@ -512,24 +485,4 @@ function formatExt(ext) {
   return (ext[0] === '.')
     ? ext.slice(1)
     : ext;
-}
-
-/**
- * Iterate over the key/value pairs on an object and do something.
- * 
- * @param  {Object}   `obj` Object to iterate over
- * @param  {Function} `cb` Iterator callback
- * @param  {Object}   `thisArg` Optional `this` context
- * @api private
- */
-
-function forOwn(obj, cb, thisArg) {
-  var keys = Object.keys(obj);
-  var len = keys.length;
-  var i = 0;
-  while (len--) {
-    var key = keys[i++];
-    var value = obj[key];
-    cb.call(thisArg, value, key);
-  }
 }

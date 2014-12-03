@@ -43,7 +43,7 @@ describe('register', function () {
   });
 
   it('should add a child loader for all types', function () {
-    loaders._register('foo', ['read'], { isSync: true, isAsync: true, isPromise: true, isStream: true });
+    loaders._register('foo', ['read'], ['sync', 'async', 'promise', 'stream']);
     loaders.cache.sync.should.have.properties('read', 'foo');
     loaders.cache.async.should.have.properties('read', 'foo');
     loaders.cache.promise.should.have.properties('read', 'foo');
