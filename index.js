@@ -32,6 +32,27 @@ function Loaders() {
 }
 
 /**
+ * Array of supported loader types as a convenience for creating
+ * utility functions to dynamically choose loaders. Currently supported
+ * types are:
+ *
+ *   - `sync`
+ *   - `async`
+ *   - `promise`
+ *   - `stream`
+ *
+ * @type {Array}
+ * @api public
+ */
+
+Loaders.loaderTypes = [
+  'sync',
+  'async',
+  'promise',
+  'stream'
+];
+
+/**
  * Base register method used by all other register method.
  *
  * @param {String} `ext`
@@ -42,13 +63,12 @@ function Loaders() {
  */
 
 Loaders.prototype._register = function(ext, fn, type) {
-  ext = formatExt(ext);
   if (Array.isArray(fn)) {
-    return this.compose(ext, fn, type);
+    return this.compose(formatExt(ext), fn, type);
   }
-  fn.type = type;
+
   this.cache[type] = this.cache[type] || {};
-  this.cache[type][ext] = [fn];
+  this.cache[type][formatExt(ext)] = [fn];
   return this;
 };
 
@@ -439,18 +459,6 @@ Loaders.prototype.loadStream = function(fp, options, stack) {
   });
   return stream;
 };
-
-/**
- * Supported loader types
- * @type {Array}
- */
-
-Loaders.loaderTypes = [
-  'sync',
-  'async',
-  'promise',
-  'stream'
-];
 
 /**
  * Get a loader based on the given pattern.
