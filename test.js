@@ -61,9 +61,16 @@ describe('loaders (sync)', function () {
     loaders.cache.sync.should.have.property('foo');
   });
 
-  it('should pass the value returned from a loader to the next loader:', function () {
+  it.only('should pass the value returned from a loader to the next loader:', function () {
     loaders.register('bar', ['read', 'yaml', 'data']);
     loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+  });
+
+  it('should compose a loader from other loaders and the given function:', function () {
+    loaders.register('foo', ['read', 'yaml'], function foo(val) {
+      return val;
+    });
+    loaders.cache.sync.should.have.property('foo');
   });
 
   it('should pass the value returned from a loader to the next loader:', function () {
