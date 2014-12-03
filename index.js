@@ -221,40 +221,6 @@ Loaders.prototype.registerStream = function(ext, fn) {
 };
 
 /**
- * Create a loader stack of the given `type` from an
- * array of `loaders`.
- *
- * @param {Array} `loaders` Names of stored loaders to add to the stack.
- * @param {String} `type=sync`
- * @return {Array} Array of loaders
- * @api public
- */
-
-Loaders.prototype.createStack = function(loaders, type) {
-  var cache = this.cache[type || 'sync'];
-  return (loaders || []).reduce(function(stack, name) {
-    return stack.concat(cache[name]);
-  }.bind(this), []).filter(Boolean);
-};
-
-/**
- * Private method for loading a stack of loaders that is
- * a combination of both stored loaders and locally defined
- * loaders.
- *
- * @param {Array} `loaders` Names of stored loaders to add to the stack.
- * @param {String} `type=sync`
- * @return {Array} Array of loaders
- * @api private
- */
-
-Loaders.prototype.loadStack = function(fp, opts, stack, type) {
-  var loader = matchLoader(fp, opts, this);
-  stack = [loader].concat(stack || []);
-  return this.createStack(stack, type);
-};
-
-/**
  * Create a loader from other (previously cached) loaders. For
  * example, you might create a loader like the following:
  *
@@ -296,6 +262,39 @@ Loaders.prototype.compose = function(ext, loaders, type) {
   return this;
 };
 
+/**
+ * Create a loader stack of the given `type` from an
+ * array of `loaders`.
+ *
+ * @param {Array} `loaders` Names of stored loaders to add to the stack.
+ * @param {String} `type=sync`
+ * @return {Array} Array of loaders
+ * @api public
+ */
+
+Loaders.prototype.createStack = function(loaders, type) {
+  var cache = this.cache[type || 'sync'];
+  return (loaders || []).reduce(function(stack, name) {
+    return stack.concat(cache[name]);
+  }.bind(this), []).filter(Boolean);
+};
+
+/**
+ * Private method for loading a stack of loaders that is
+ * a combination of both stored loaders and locally defined
+ * loaders.
+ *
+ * @param {Array} `loaders` Names of stored loaders to add to the stack.
+ * @param {String} `type=sync`
+ * @return {Array} Array of loaders
+ * @api private
+ */
+
+Loaders.prototype.loadStack = function(fp, opts, stack, type) {
+  var loader = matchLoader(fp, opts, this);
+  stack = [loader].concat(stack || []);
+  return this.createStack(stack, type);
+};
 
 /**
  * Run loaders associated with `ext` of the given filepath.
