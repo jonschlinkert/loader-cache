@@ -52,7 +52,7 @@ var Loaders = require('loader-cache');
 var loaders = new Loaders();
 ```
 
-### [.register](index.js#L87)
+### [.register](index.js#L97)
 
 Register the given loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -77,7 +77,7 @@ loaders.register('read', function(fp) {
 loaders.register('yml', ['read', 'yaml']);
 ```
 
-### [.registerAsync](index.js#L121)
+### [.registerAsync](index.js#L131)
 
 Register the given async loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -102,7 +102,7 @@ loaders.registerAsync('read', function(fp, next) {
 loaders.registerAsync('yml', ['read', 'yaml']);
 ```
 
-### [.registerPromise](index.js#L165)
+### [.registerPromise](index.js#L175)
 
 Register the given promise loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -137,7 +137,7 @@ loaders.registerPromise('read', function(fp) {
 loaders.registerPromise('yml', ['read', 'yaml']);
 ```
 
-### [.registerStream](index.js#L201)
+### [.registerStream](index.js#L211)
 
 Register the given stream loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -164,7 +164,7 @@ loaders.registerStream('read', function(fp) {
 loaders.registerStream('yml', ['read', 'yaml']);
 ```
 
-### [.createStack](index.js#L215)
+### [.createStack](index.js#L225)
 
 * `loaders` **{Array}**: Names of stored loaders to add to the stack.    
 * `type=sync` **{String}**    
@@ -173,7 +173,7 @@ loaders.registerStream('yml', ['read', 'yaml']);
 Create a loader stack of the given `type` from an
 array of `loaders`.
 
-### [.load](index.js#L299)
+### [.load](index.js#L308)
 
 Run loaders associated with `ext` of the given filepath.
 
@@ -188,7 +188,7 @@ Run loaders associated with `ext` of the given filepath.
 loaders.load('config.yml');
 ```
 
-### [.loadAsync](index.js#L334)
+### [.loadAsync](index.js#L343)
 
 Run async loaders associated with `ext` of the given filepath.
 
@@ -206,7 +206,7 @@ loaders.loadAsync('config.yml', function (err, obj) {
 });
 ```
 
-### [.loadPromise](index.js#L376)
+### [.loadPromise](index.js#L391)
 
 Run promise loaders associated with `ext` of the given filepath.
 
@@ -224,7 +224,7 @@ loaders.loadPromise('config.yml')
   });
 ```
 
-### [.loadStream](index.js#L414)
+### [.loadStream](index.js#L429)
 
 Run stream loaders associated with `ext` of the given filepath.
 

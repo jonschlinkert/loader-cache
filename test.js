@@ -17,6 +17,45 @@ var Loaders = require('./');
 
 var loaders;
 
+describe('register', function () {
+  beforeEach(function () {
+    loaders = new Loaders();
+
+    // sync read loader
+    loaders.register('read', function (fp) {
+      return fs.readFileSync(fp, 'utf8');
+    });
+
+    // async read loader
+    loaders.registerAsync('read', function read(fp, options, next) {
+      fs.readFile(fp, 'utf8', next);
+    });
+
+    // promise read loader
+    loaders.registerPromise('read', Promise.method(function read(fp) {
+      return fs.readFileSync(fp, 'utf8');
+    }));
+
+    // stream read loaders
+    loaders.registerStream('read', es.through(function read(fp) {
+      this.emit('data', fs.readFileSync(fp, 'utf8'));
+    }));
+  });
+
+  it('should add a child loader for all types', function () {
+    loaders._register('foo', ['read'], { isSync: true, isAsync: true, isPromise: true, isStream: true });
+    loaders.cache.sync.should.have.properties('read', 'foo');
+    loaders.cache.async.should.have.properties('read', 'foo');
+    loaders.cache.promise.should.have.properties('read', 'foo');
+    loaders.cache.stream.should.have.properties('read', 'foo');
+
+    loaders.cache.sync.foo[0].type.should.eql('sync');
+    loaders.cache.async.foo[0].type.should.eql('async');
+    loaders.cache.promise.foo[0].type.should.eql('promise');
+    loaders.cache.stream.foo[0].type.should.eql('stream');
+  });
+});
+
 describe('loaders (sync)', function () {
   beforeEach(function() {
     loaders = new Loaders();
@@ -267,7 +306,6 @@ describe('loaders (promise)', function () {
     });
   });
 });
-
 
 describe('loaders (stream)', function () {
   beforeEach(function() {

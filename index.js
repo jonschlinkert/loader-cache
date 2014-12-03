@@ -36,21 +36,31 @@ function Loaders() {
  *
  * @param {String} `ext`
  * @param {Function} `fn`
- * @param {String} `type`
- * @return {String}
+ * @param {String|Object} `types`
+ * @return {Object}
  * @api private
  */
 
-Loaders.prototype._register = function(ext, fn, type) {
+Loaders.prototype._register = function(ext, fn, types) {
   ext = formatExt(ext);
-
-  if (Array.isArray(fn)) {
-    return this.compose(ext, fn, type);
+  if (types && typeof types === 'string') {
+    var type = types;
+    types = {};
+    types[type] = true;
   }
 
-  fn.type = type;
-  this.cache[type] = this.cache[type] || {};
-  this.cache[type][ext] = [fn];
+  forOwn(types, function (value, key) {
+    var type = pickLoader(key);
+    if (value && type) {
+      if (Array.isArray(fn)) {
+        return this.compose(ext, fn, type);
+      }
+
+      fn.type = type;
+      this.cache[type] = this.cache[type] || {};
+      this.cache[type][ext] = [fn];
+    }
+  }, this);
   return this;
 };
 
@@ -443,6 +453,39 @@ Loaders.prototype.loadStream = function(fp, options, stack) {
 };
 
 /**
+ * Supported loader types
+ * @type {Array}
+ */
+
+Loaders.loaderTypes = [
+  'sync',
+  'async',
+  'promise',
+  'stream'
+];
+
+/**
+ * Determine if the string is a valid and supported loader type.
+ * 
+ * @param  {String} `str` string to validate
+ * @return {String} validated string
+ */
+
+function pickLoader(str) {
+  if (!str || typeof str !== 'string') return undefined;
+  var type;
+  var capital = /[A-Z]/.exec(str);
+  if (capital) {
+    var i = str.indexOf(capital);
+    type = str.slice(i).toLowerCase();
+  } else {
+    type = str;
+  }
+  if (Loaders.loaderTypes.indexOf(type) === -1) return undefined;
+  return type;
+}
+
+/**
  * Get a loader based on the given pattern.
  *
  * @param {String} `pattern` By default, this is assumed to be a filepath.
@@ -469,4 +512,24 @@ function formatExt(ext) {
   return (ext[0] === '.')
     ? ext.slice(1)
     : ext;
+}
+
+/**
+ * Iterate over the key/value pairs on an object and do something.
+ * 
+ * @param  {Object}   `obj` Object to iterate over
+ * @param  {Function} `cb` Iterator callback
+ * @param  {Object}   `thisArg` Optional `this` context
+ * @api private
+ */
+
+function forOwn(obj, cb, thisArg) {
+  var keys = Object.keys(obj);
+  var len = keys.length;
+  var i = 0;
+  while (len--) {
+    var key = keys[i++];
+    var value = obj[key];
+    cb.call(thisArg, value, key);
+  }
 }
