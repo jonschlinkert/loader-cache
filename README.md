@@ -111,7 +111,7 @@ loaders.registerAsync('read', function(fp, next) {
 loaders.registerAsync('yml', ['read', 'yaml']);
 ```
 
-### [.registerPromise](index.js#L183)
+### [.registerPromise](index.js#L184)
 
 Register the given promise loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -122,9 +122,10 @@ Register the given promise loader callback `fn` as `ext`. Any arbitrary name can
 **Examples**
 
 ```js
+var Promise = require('bluebird');
+
 // register an promise loader for parsing YAML
 loaders.registerPromise('yaml', function(fp) {
-   var Promise = require('bluebird');
    var deferred = Promise.pending();
    process.nextTick(function () {
      deferred.fulfill(YAML.safeLoad(fp));
@@ -146,7 +147,7 @@ loaders.registerPromise('read', function(fp) {
 loaders.registerPromise('yml', ['read', 'yaml']);
 ```
 
-### [.registerStream](index.js#L219)
+### [.registerStream](index.js#L220)
 
 Register the given stream loader callback `fn` as `ext`. Any arbitrary name can be assigned to a loader, however, the loader will only be called when either:   a. `ext` matches the file extension of a path passed to the `.load()` method, or   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
 
@@ -173,7 +174,7 @@ loaders.registerStream('read', function(fp) {
 loaders.registerStream('yml', ['read', 'yaml']);
 ```
 
-### [.createStack](index.js#L233)
+### [.createTypeStack](index.js#L276)
 
 * `loaders` **{Array}**: Names of stored loaders to add to the stack.    
 * `type=sync` **{String}**    
@@ -203,7 +204,7 @@ Run async loaders associated with `ext` of the given filepath.
 
 * `fp` **{String}**: File path to load.    
 * `options` **{Object}**: Options to pass to whatever loaders are defined.    
-* `done` **{Function}**: Callback to indicate loading has finished    
+* `cb` **{Function}**: Callback to indicate loading has finished    
 * `returns`: {String}  
 
 **Example**
@@ -215,7 +216,7 @@ loaders.loadAsync('config.yml', function (err, obj) {
 });
 ```
 
-### [.loadPromise](index.js#L399)
+### [.loadPromise](index.js#L393)
 
 Run promise loaders associated with `ext` of the given filepath.
 
@@ -233,7 +234,7 @@ loaders.loadPromise('config.yml')
   });
 ```
 
-### [.loadStream](index.js#L437)
+### [.loadStream](index.js#L431)
 
 Run stream loaders associated with `ext` of the given filepath.
 
