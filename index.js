@@ -255,7 +255,7 @@ Loaders.prototype.compose = function(ext, loaders, type) {
   type = type || 'sync';
 
   var cache = this.cache[type] || {};
-  var stack = this.createStack(loaders, type);
+  var stack = this.createTypeStack(loaders, type);
 
   cache[ext] = cache[ext] || [];
   cache[ext] = cache[ext].concat(stack);
@@ -272,7 +272,7 @@ Loaders.prototype.compose = function(ext, loaders, type) {
  * @api public
  */
 
-Loaders.prototype.createStack = function(loaders, type) {
+Loaders.prototype.createTypeStack = function(loaders, type) {
   var cache = this.cache[type || 'sync'];
   return (loaders || []).reduce(function(stack, name) {
     return stack.concat(cache[name]);
@@ -290,10 +290,10 @@ Loaders.prototype.createStack = function(loaders, type) {
  * @api private
  */
 
-Loaders.prototype.loadStack = function(fp, opts, stack, type) {
+Loaders.prototype.loadStack = function(fp, stack, opts, type) {
   var loader = matchLoader(fp, opts, this);
   stack = [loader].concat(stack || []);
-  return this.createStack(stack, type);
+  return this.createTypeStack(stack, type);
 };
 
 /**
@@ -312,13 +312,13 @@ Loaders.prototype.loadStack = function(fp, opts, stack, type) {
  * @api public
  */
 
-Loaders.prototype.load = function(fp, options, stack) {
-  if (Array.isArray(options)) {
-    stack = options;
-    options = {};
+Loaders.prototype.load = function(fp, stack, options) {
+  if (!Array.isArray(stack)) {
+    options = stack;
+    stack = [];
   }
 
-  var fns = this.loadStack(fp, options, stack);
+  var fns = this.loadStack(fp, stack, options);
   if (!fns || fns.length === 0) {
     return fp;
   }
@@ -342,30 +342,24 @@ Loaders.prototype.load = function(fp, options, stack) {
  *
  * @param {String} `fp` File path to load.
  * @param {Object} `options` Options to pass to whatever loaders are defined.
- * @param {Function} `done` Callback to indicate loading has finished
+ * @param {Function} `cb` Callback to indicate loading has finished
  * @return {String}
  * @api public
  */
 
-Loaders.prototype.loadAsync = function(fp, options, stack, done) {
-  if (Array.isArray(options)) {
-    done = stack;
-    stack = options;
+Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
+  if (typeof options === 'function') {
+    cb = options;
     options = {};
   }
 
   if (typeof stack === 'function') {
-    done = stack;
-    stack = [];
-  }
-
-  if (typeof options === 'function') {
-    done = options;
+    cb = stack;
     options = {};
     stack = [];
   }
 
-  var fns = this.loadStack(fp, options, stack, 'async');
+  var fns = this.loadStack(fp, stack, options, 'async');
   if (!fns || fns.length === 0) {
     return fp;
   }
@@ -373,7 +367,7 @@ Loaders.prototype.loadAsync = function(fp, options, stack, done) {
   var async = require('async');
   async.reduce(fns, fp, function (acc, fn, next) {
     fn(acc, options, next);
-  }, done);
+  }, cb);
 };
 
 /**
@@ -395,15 +389,15 @@ Loaders.prototype.loadAsync = function(fp, options, stack, done) {
  * @api public
  */
 
-Loaders.prototype.loadPromise = function(fp, options, stack) {
-  if (Array.isArray(options)) {
-    stack = options;
-    options = {};
+Loaders.prototype.loadPromise = function(fp, stack, options) {
+  if (!Array.isArray(stack)) {
+    options = stack;
+    stack = [];
   }
 
   options = options || {};
 
-  var fns = this.loadStack(fp, options, stack, 'promise');
+  var fns = this.loadStack(fp, stack, options, 'promise');
   var Promise = require('bluebird');
   var current = Promise.resolve();
 
@@ -433,16 +427,16 @@ Loaders.prototype.loadPromise = function(fp, options, stack) {
  * @api public
  */
 
-Loaders.prototype.loadStream = function(fp, options, stack) {
-  if (Array.isArray(options)) {
-    stack = options;
-    options = {};
+Loaders.prototype.loadStream = function(fp, stack, options) {
+  if (!Array.isArray(stack)) {
+    options = stack;
+    stack = [];
   }
 
   var es = require('event-stream');
   options = options || {};
 
-  var fns = this.loadStack(fp, options, stack, 'stream');
+  var fns = this.loadStack(fp, stack, options, 'stream');
   if (!fns || fns.length === 0) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
