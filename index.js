@@ -42,20 +42,8 @@ function Loaders() {
  * @api private
  */
 
-Loaders.prototype.register = function(ext, stack, fn, type) {
-  type = filter(arguments, 'string')[1] || 'sync';
-  stack = filter(arguments, 'array');
-
-  if (stack.length) {
-    return this.compose(ext, stack[0], fn, type);
-  }
-
-  var obj = filter(arguments, 'object')[0];
-  fn = filter(arguments, 'function')[0];
-
-  this.cache[type] = this.cache[type] || {};
-  this.cache[type][ext] = [fn || obj];
-  return this;
+Loaders.prototype.register = function(ext, /* fns | arr, */ type) {
+  return this.compose.apply(this, arguments);
 };
 
 /**
@@ -89,7 +77,9 @@ Loaders.prototype.registerSync = function(ext, stack, fn) {
  */
 
 Loaders.prototype.registerAsync = function(ext, stack, fn) {
-  this.register(ext, stack, fn, 'async');
+  var args = [].slice.apply(arguments);
+  args.push('async');
+  this.register.apply(this, args);
 };
 
 /**
@@ -106,7 +96,9 @@ Loaders.prototype.registerAsync = function(ext, stack, fn) {
  */
 
 Loaders.prototype.registerPromise = function(ext, stack, fn) {
-  this.register(ext, stack, fn, 'promise');
+  var args = [].slice.apply(arguments);
+  args.push('promise');
+  this.register.apply(this, args);
 };
 
 /**
@@ -123,7 +115,9 @@ Loaders.prototype.registerPromise = function(ext, stack, fn) {
  */
 
 Loaders.prototype.registerStream = function(ext, stack, fn) {
-  this.register(ext, stack, fn, 'stream');
+  var args = [].slice.apply(arguments);
+  args.push('stream');
+  this.register.apply(this, args);
 };
 
 /**
@@ -137,27 +131,34 @@ Loaders.prototype.registerStream = function(ext, stack, fn) {
  * @api private
  */
 
-Loaders.prototype.compose = function(ext, stack, fn, type) {
+Loaders.prototype.compose = function(ext, /* stack | fns, */ type) {
   type = filter(arguments, 'string')[1] || 'sync';
-
-  var stored = this.buildStack(type, stack);
+  var stack = filter(arguments, ['array', 'function', 'object']);
+  stack = this.buildStack(type, stack);
 
   this.cache[type] = this.cache[type] || {};
-  this.cache[type][ext] = union(this.cache[type][ext] || [], fn || []);
-
-  console.log(fn)
-  // while (len--) {
-  //   var stored = this.cache[type][stack[len]];
-  //   // console.log(this.cache[type][ext])
-  //   this.cache[type][ext] = union(stored, this.cache[type][ext]);
-  // }
+  this.cache[type][ext] = union(this.cache[type][ext] || [], stack);
   return this;
 };
 
+/**
+ * Build a stack of loader functions when given a mix of functions and names.
+ * 
+ * @param  {String} `type` Loader type to get loaders from.
+ * @param  {Array}  `stack` Stack of loader functions and names.
+ * @return {Array}  Resolved loader functions
+ */
+
 Loaders.prototype.buildStack = function(type, stack) {
-  return stack.map(function(name) {
-    return this.cache[type][name];
-  }.bind(this));
+  return flatten(stack.map(function(name) {
+    if (typeOf(name) === 'string') {
+      return this.cache[type][name];
+    }
+    if (typeOf(name) === 'array') {
+      return this.buildStack(type, name);
+    }
+    return name;
+  }.bind(this)));
 };
 
 /**
@@ -176,8 +177,12 @@ Loaders.prototype.buildStack = function(type, stack) {
  * @api public
  */
 
-Loaders.prototype.load = function(fp, options) {
-  var fns = this.cache.sync[matchLoader(fp, options, this)];
+Loaders.prototype.load = function(fp, stack, options) {
+  if (!Array.isArray(stack)) {
+    options = stack;
+    stack = [];
+  }
+  var fns = union(this.cache.sync[matchLoader(fp, options, this)] || [], this.buildStack('sync', stack));
   if (!fns) return fp;
 
   return fns.reduce(function (acc, fn) {
@@ -204,14 +209,25 @@ Loaders.prototype.load = function(fp, options) {
  * @api public
  */
 
-Loaders.prototype.loadAsync = function(fp, options, cb) {
+Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
   var async = require('async');
-  if (typeof options === 'function') {
+  if (typeOf(stack) === 'function') {
+    cb = stack;
+    stack = [];
+    options = {};
+  }
+
+  if (typeOf(options) === 'function') {
     cb = options;
     options = {};
   }
 
-  var fns = this.cache.async[matchLoader(fp, options, this)];
+  if (!Array.isArray(stack)) {
+    options = stack;
+    stack = [];
+  }
+
+  var fns = union(this.cache.async[matchLoader(fp, options, this)] || [], this.buildStack('async', stack));
   if (!fns) return fp;
 
   async.reduce(fns, fp, function (acc, fn, next) {
@@ -238,12 +254,16 @@ Loaders.prototype.loadAsync = function(fp, options, cb) {
  * @api public
  */
 
-Loaders.prototype.loadPromise = function(fp, options) {
+Loaders.prototype.loadPromise = function(fp, stack, options) {
+  if (!Array.isArray(stack)) {
+    options = stack;
+    stack = [];
+  }
   var Promise = require('bluebird');
   var current = Promise.resolve();
   options = options || {};
 
-  var fns = this.cache.promise[matchLoader(fp, options, this)];
+  var fns = union(this.cache.promise[matchLoader(fp, options, this)] || [], this.buildStack('promise', stack));
   if (!fns) return current.then(function () { return fp; });
 
   return Promise.reduce(fns, function (acc, fn) {
@@ -271,11 +291,15 @@ Loaders.prototype.loadPromise = function(fp, options) {
  * @api public
  */
 
-Loaders.prototype.loadStream = function(fp, options) {
+Loaders.prototype.loadStream = function(fp, stack, options) {
+  if (!Array.isArray(stack)) {
+    options = stack;
+    stack = [];
+  }
   var es = require('event-stream');
   options = options || {};
 
-  var fns = this.cache.stream[matchLoader(fp, options, this)];
+  var fns = union(this.cache.stream[matchLoader(fp, options, this)] || [], this.buildStack('stream', stack));
   if (!fns) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
@@ -331,13 +355,29 @@ function union() {
   return [].concat.apply([], arguments).filter(Boolean);
 }
 
+/**
+ * Array flatten util.
+ *
+ * @api private
+ */
 
-function filter(arr, type) {
+function flatten() {
+  var args = [].concat.apply([], arguments);
+  return args.reduce(function (acc, arg) {
+    if (typeOf(arg) === 'array')
+      return acc.concat(flatten(arg));
+    return acc.concat(arg);
+  }, []);
+}
+
+
+function filter(arr, types) {
+  types = Array.isArray(types) ? types : [types];
   var len = arr.length;
   var res = [];
   for (var i = 0; i < len; i++) {
     var ele = arr[i];
-    if (typeOf(ele) === type) {
+    if (types.indexOf(typeOf(ele)) !== -1) {
       res.push(ele);
     }
   }
