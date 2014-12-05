@@ -9,12 +9,20 @@
 
 var path = require('path');
 var typeOf = require('kind-of');
+var slice = require('array-slice');
+var flatten = require('arr-flatten');
 
 /**
  * Expose `Loaders`
  */
 
 module.exports = Loaders;
+
+/**
+ * requires cache
+ */
+
+var requires = {};
 
 /**
  * Create a new instance of `Loaders`
@@ -42,7 +50,7 @@ function Loaders() {
  * @api private
  */
 
-Loaders.prototype.register = function(ext, /* fns | arr, */ type) {
+Loaders.prototype.register = function(/*ext, fns, arr, type*/) {
   return this.compose.apply(this, arguments);
 };
 
@@ -76,10 +84,8 @@ Loaders.prototype.registerSync = function(ext, stack, fn) {
  * @api public
  */
 
-Loaders.prototype.registerAsync = function(ext, stack, fn) {
-  var args = [].slice.apply(arguments);
-  args.push('async');
-  this.register.apply(this, args);
+Loaders.prototype.registerAsync = function(/*ext, stack, fn*/) {
+  this.register.apply(this, slice(arguments).concat('async'));
 };
 
 /**
@@ -95,10 +101,8 @@ Loaders.prototype.registerAsync = function(ext, stack, fn) {
  * @api public
  */
 
-Loaders.prototype.registerPromise = function(ext, stack, fn) {
-  var args = [].slice.apply(arguments);
-  args.push('promise');
-  this.register.apply(this, args);
+Loaders.prototype.registerPromise = function(/*ext, stack, fn*/) {
+  this.register.apply(this, slice(arguments).concat('promise'));
 };
 
 /**
@@ -114,10 +118,8 @@ Loaders.prototype.registerPromise = function(ext, stack, fn) {
  * @api public
  */
 
-Loaders.prototype.registerStream = function(ext, stack, fn) {
-  var args = [].slice.apply(arguments);
-  args.push('stream');
-  this.register.apply(this, args);
+Loaders.prototype.registerStream = function(/*ext, stack, fn*/) {
+  this.register.apply(this, slice(arguments).concat('stream'));
 };
 
 /**
@@ -131,7 +133,7 @@ Loaders.prototype.registerStream = function(ext, stack, fn) {
  * @api private
  */
 
-Loaders.prototype.compose = function(ext, /* stack | fns, */ type) {
+Loaders.prototype.compose = function(ext/*, stack, fns*/, type) {
   type = filter(arguments, 'string')[1] || 'sync';
   var stack = filter(arguments, ['array', 'function', 'object']);
   stack = this.buildStack(type, stack);
@@ -143,7 +145,7 @@ Loaders.prototype.compose = function(ext, /* stack | fns, */ type) {
 
 /**
  * Build a stack of loader functions when given a mix of functions and names.
- * 
+ *
  * @param  {String} `type` Loader type to get loaders from.
  * @param  {Array}  `stack` Stack of loader functions and names.
  * @return {Array}  Resolved loader functions
@@ -182,9 +184,14 @@ Loaders.prototype.load = function(fp, stack, options) {
     options = stack;
     stack = [];
   }
-  var fns = union(this.cache.sync[matchLoader(fp, options, this)] || [], this.buildStack('sync', stack));
-  if (!fns) return fp;
 
+  var loader = matchLoader(fp, options, this);
+  stack = this.buildStack('sync', stack);
+
+  var fns = union(this.cache.sync[loader] || [], stack);
+  if (!fns) {
+    return fp;
+  }
   return fns.reduce(function (acc, fn) {
     return fn(acc, options);
   }, fp);
@@ -210,7 +217,7 @@ Loaders.prototype.load = function(fp, stack, options) {
  */
 
 Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
-  var async = require('async');
+  var async = requires.async || (requires.async = require('async'));
   if (typeOf(stack) === 'function') {
     cb = stack;
     stack = [];
@@ -227,8 +234,13 @@ Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
     stack = [];
   }
 
-  var fns = union(this.cache.async[matchLoader(fp, options, this)] || [], this.buildStack('async', stack));
-  if (!fns) return fp;
+  stack = this.buildStack('async', stack);
+
+  var loader = matchLoader(fp, options, this);
+  var fns = union(this.cache.async[loader] || [], stack);
+  if (!fns) {
+    return fp;
+  }
 
   async.reduce(fns, fp, function (acc, fn, next) {
     fn(acc, options, next);
@@ -255,16 +267,24 @@ Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
  */
 
 Loaders.prototype.loadPromise = function(fp, stack, options) {
+  var Promise = requires.promise || (requires.promise = require('bluebird'));
   if (!Array.isArray(stack)) {
     options = stack;
     stack = [];
   }
-  var Promise = require('bluebird');
+
   var current = Promise.resolve();
   options = options || {};
 
-  var fns = union(this.cache.promise[matchLoader(fp, options, this)] || [], this.buildStack('promise', stack));
-  if (!fns) return current.then(function () { return fp; });
+  var loader = matchLoader(fp, options, this);
+  stack = this.buildStack('promise', stack);
+
+  var fns = union(this.cache.promise[loader] || [], stack);
+  if (!fns) {
+    return current.then(function () {
+      return fp;
+    });
+  }
 
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
@@ -292,14 +312,17 @@ Loaders.prototype.loadPromise = function(fp, stack, options) {
  */
 
 Loaders.prototype.loadStream = function(fp, stack, options) {
+  var es = requires.es || (requires.es = require('event-stream'));
   if (!Array.isArray(stack)) {
     options = stack;
     stack = [];
   }
-  var es = require('event-stream');
-  options = options || {};
 
-  var fns = union(this.cache.stream[matchLoader(fp, options, this)] || [], this.buildStack('stream', stack));
+  options = options || {};
+  var loader = matchLoader(fp, options, this);
+  stack = this.buildStack('stream', stack);
+
+  var fns = union(this.cache.stream[loader] || [], stack);
   if (!fns) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
@@ -352,34 +375,31 @@ function formatExt(ext) {
  */
 
 function union() {
-  return [].concat.apply([], arguments).filter(Boolean);
+  return [].concat.apply([], arguments)
+    .filter(Boolean);
 }
 
 /**
- * Array flatten util.
+ * Filter util
  *
  * @api private
  */
 
-function flatten() {
-  var args = [].concat.apply([], arguments);
-  return args.reduce(function (acc, arg) {
-    if (typeOf(arg) === 'array')
-      return acc.concat(flatten(arg));
-    return acc.concat(arg);
-  }, []);
-}
-
-
 function filter(arr, types) {
-  types = Array.isArray(types) ? types : [types];
+  types = !Array.isArray(types)
+    ? [types]
+    : types;
+
   var len = arr.length;
   var res = [];
-  for (var i = 0; i < len; i++) {
-    var ele = arr[i];
+  var i = 0;
+
+  while (len--) {
+    var ele = arr[i++];
     if (types.indexOf(typeOf(ele)) !== -1) {
-      res.push(ele);
+      res = res.concat(ele);
     }
   }
+
   return res;
 }
