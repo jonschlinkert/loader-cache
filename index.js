@@ -8,12 +8,21 @@
 'use strict';
 
 var path = require('path');
+var typeOf = require('kind-of');
+var slice = require('array-slice');
+var flatten = require('arr-flatten');
 
 /**
  * Expose `Loaders`
  */
 
 module.exports = Loaders;
+
+/**
+ * requires cache
+ */
+
+var requires = {};
 
 /**
  * Create a new instance of `Loaders`
@@ -32,44 +41,17 @@ function Loaders() {
 }
 
 /**
- * Array of supported loader types as a convenience for creating
- * utility functions to dynamically choose loaders. Currently supported
- * types are:
- *
- *   - `sync`
- *   - `async`
- *   - `promise`
- *   - `stream`
- *
- * @type {Array}
- * @api public
- */
-
-Loaders.loaderTypes = [
-  'sync',
-  'async',
-  'promise',
-  'stream'
-];
-
-/**
  * Base register method used by all other register method.
  *
  * @param {String} `ext`
- * @param {Function|Array} `fn`
+ * @param {Function} `fn`
  * @param {String} `type`
- * @return {Object}
+ * @return {String}
  * @api private
  */
 
-Loaders.prototype._register = function(ext, fn, type) {
-  if (Array.isArray(fn)) {
-    return this.compose(formatExt(ext), fn, type);
-  }
-
-  this.cache[type] = this.cache[type] || {};
-  this.cache[type][formatExt(ext)] = [fn];
-  return this;
+Loaders.prototype.register = function(/*ext, fns, arr, type*/) {
+  return this.compose.apply(this, arguments);
 };
 
 /**
@@ -79,31 +61,14 @@ Loaders.prototype._register = function(ext, fn, type) {
  *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
  *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
  *
- * **Examples**
- *
- * ```js
- * // register a loader for parsing YAML
- * loaders.register('yaml', function(fp) {
- *   return YAML.safeLoad(fp);
- * });
- *
- * // register a loader to be used in other loaders
- * loaders.register('read', function(fp) {
- *   return fs.readFileSync(fp, 'utf8');
- * });
- *
- * // create a new loader from the `yaml` and `read` loaders.
- * loaders.register('yml', ['read', 'yaml']);
- * ```
- *
  * @param {String|Array} `ext` File extension or name of the loader.
  * @param {Function|Array} `fn` A loader function, or create a loader from other others by passing an array of names.
  * @return {Object} `Loaders` to enable chaining
  * @api public
  */
 
-Loaders.prototype.register = function(ext, fn, type) {
-  this._register(ext, fn, type || 'sync');
+Loaders.prototype.registerSync = function(ext, stack, fn) {
+  this.register(ext, stack, fn, 'sync');
 };
 
 /**
@@ -113,31 +78,14 @@ Loaders.prototype.register = function(ext, fn, type) {
  *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
  *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
  *
- * **Examples**
- *
- * ```js
- * // register an async loader for parsing YAML
- * loaders.registerAsync('yaml', function(fp, next) {
- *    next(null, YAML.safeLoad(fp));
- * });
- *
- * // register a loader to be used in other loaders
- * loaders.registerAsync('read', function(fp, next) {
- *   fs.readFile(fp, 'utf8', next);
- * });
- *
- * // create a new loader from the `yaml` and `read` loaders.
- * loaders.registerAsync('yml', ['read', 'yaml']);
- * ```
- *
  * @param {String|Array} `ext` File extension or name of the loader.
  * @param {Function|Array} `fn` A loader function with a callback parameter, or create a loader from other others by passing an array of names.
  * @return {Object} `Loaders` to enable chaining
  * @api public
  */
 
-Loaders.prototype.registerAsync = function(ext, fn) {
-  this._register(ext, fn, 'async');
+Loaders.prototype.registerAsync = function(/*ext, stack, fn*/) {
+  this.register.apply(this, slice(arguments).concat('async'));
 };
 
 /**
@@ -147,42 +95,14 @@ Loaders.prototype.registerAsync = function(ext, fn) {
  *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
  *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
  *
- * **Examples**
- *
- * ```js
- * var Promise = require('bluebird');
- *
- * // register an promise loader for parsing YAML
- * loaders.registerPromise('yaml', function(fp) {
- *    var deferred = Promise.pending();
- *    process.nextTick(function () {
- *      deferred.fulfill(YAML.safeLoad(fp));
- *    });
- *    return deferred.promise;
- * });
- *
- * // register a loader to be used in other loaders
- * loaders.registerPromise('read', function(fp) {
- *    var Promise = require('bluebird');
- *    var deferred = Promise.pending();
- *    fs.readFile(fp, 'utf8', function (err, content) {
- *      deferred.fulfill(content);
- *    });
- *    return deferred.promise;
- * });
- *
- * // create a new loader from the `yaml` and `read` loaders.
- * loaders.registerPromise('yml', ['read', 'yaml']);
- * ```
- *
  * @param {String|Array} `ext` File extension or name of the loader.
  * @param {Function|Array} `fn` A loader function that returns a promise, or create a loader from other others by passing an array of names.
  * @return {Object} `Loaders` to enable chaining
  * @api public
  */
 
-Loaders.prototype.registerPromise = function(ext, fn) {
-  this._register(ext, fn, 'promise');
+Loaders.prototype.registerPromise = function(/*ext, stack, fn*/) {
+  this.register.apply(this, slice(arguments).concat('promise'));
 };
 
 /**
@@ -192,59 +112,20 @@ Loaders.prototype.registerPromise = function(ext, fn) {
  *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
  *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
  *
- * **Examples**
- *
- * ```js
- * // register an stream loader for parsing YAML
- * loaders.registerStream('yaml', es.through(function(fp) {
- *   this.emit('data', YAML.safeLoad(fp));
- * });
- *
- * // register a loader to be used in other loaders
- * loaders.registerStream('read', function(fp) {
- *   fs.readFile(fp, 'utf8', function (err, content) {
- *     this.emit('data', content);
- *   });
- * });
- *
- * // create a new loader from the `yaml` and `read` loaders.
- * loaders.registerStream('yml', ['read', 'yaml']);
- * ```
- *
  * @param {String|Array} `ext` File extension or name of the loader.
  * @param {Stream|Array} `fn` A stream loader, or create a loader from other others by passing an array of names.
  * @return {Object} `Loaders` to enable chaining
  * @api public
  */
 
-Loaders.prototype.registerStream = function(ext, fn) {
-  this._register(ext, fn, 'stream');
+Loaders.prototype.registerStream = function(/*ext, stack, fn*/) {
+  this.register.apply(this, slice(arguments).concat('stream'));
 };
 
 /**
  * Create a loader from other (previously cached) loaders. For
  * example, you might create a loader like the following:
  *
- * **Example**
- *
- * ```js
- * // arbitrary name, so it won't match file extensions. This
- * // loader will be used in other loaders for reading files
- * loaders.register('read', function(fp) {
- *   return fs.readFileSync(fp, 'utf8');
- * });
- *
- * // Parse a string of YAML
- * loaders.register('yaml', function(fp) {
- *   return YAML.safeLoad(fp);
- * });
- *
- * // Compose a new loader that will read a file, then parse it as YAML
- * loaders.compose('yml', ['read', 'yaml']);
- *
- * // you can alternatively do the same thing with the register method, e.g.
- * loaders.register('yml', ['read', 'yaml']);
- * ```
  *
  * @param {String} `ext` File extension to select the loader or loader stack to use.
  * @param {String} `loaders` Array of loader names.
@@ -252,49 +133,34 @@ Loaders.prototype.registerStream = function(ext, fn) {
  * @api private
  */
 
-Loaders.prototype.compose = function(ext, loaders, type) {
-  type = type || 'sync';
+Loaders.prototype.compose = function(ext/*, stack, fns*/, type) {
+  type = filter(arguments, 'string')[1] || 'sync';
+  var stack = filter(arguments, ['array', 'function', 'object']);
+  stack = this.buildStack(type, stack);
 
-  var cache = this.cache[type] || {};
-  var stack = this.createTypeStack(loaders, type);
-
-  cache[ext] = cache[ext] || [];
-  cache[ext] = cache[ext].concat(stack);
+  this.cache[type] = this.cache[type] || {};
+  this.cache[type][ext] = union(this.cache[type][ext] || [], stack);
   return this;
 };
 
 /**
- * Create a loader stack of the given `type` from an
- * array of `loaders`.
+ * Build a stack of loader functions when given a mix of functions and names.
  *
- * @param {Array} `loaders` Names of stored loaders to add to the stack.
- * @param {String} `type=sync`
- * @return {Array} Array of loaders
- * @api public
+ * @param  {String} `type` Loader type to get loaders from.
+ * @param  {Array}  `stack` Stack of loader functions and names.
+ * @return {Array}  Resolved loader functions
  */
 
-Loaders.prototype.createTypeStack = function(loaders, type) {
-  var cache = this.cache[type || 'sync'];
-  return (loaders || []).reduce(function(stack, name) {
-    return stack.concat(cache[name]);
-  }.bind(this), []).filter(Boolean);
-};
-
-/**
- * Private method for loading a stack of loaders that is
- * a combination of both stored loaders and locally defined
- * loaders.
- *
- * @param {Array} `loaders` Names of stored loaders to add to the stack.
- * @param {String} `type=sync`
- * @return {Array} Array of loaders
- * @api private
- */
-
-Loaders.prototype.loadStack = function(fp, stack, opts, type) {
-  var loader = matchLoader(fp, opts, this);
-  stack = [loader].concat(stack || []);
-  return this.createTypeStack(stack, type);
+Loaders.prototype.buildStack = function(type, stack) {
+  return flatten(stack.map(function(name) {
+    if (typeOf(name) === 'string') {
+      return this.cache[type][name];
+    }
+    if (typeOf(name) === 'array') {
+      return this.buildStack(type, name);
+    }
+    return name;
+  }.bind(this)));
 };
 
 /**
@@ -319,11 +185,13 @@ Loaders.prototype.load = function(fp, stack, options) {
     stack = [];
   }
 
-  var fns = this.loadStack(fp, stack, options);
-  if (!fns || fns.length === 0) {
+  var loader = matchLoader(fp, options, this);
+  stack = this.buildStack('sync', stack);
+
+  var fns = union(this.cache.sync[loader] || [], stack);
+  if (!fns) {
     return fp;
   }
-
   return fns.reduce(function (acc, fn) {
     return fn(acc, options);
   }, fp);
@@ -349,23 +217,31 @@ Loaders.prototype.load = function(fp, stack, options) {
  */
 
 Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
-  if (typeof options === 'function') {
+  var async = requires.async || (requires.async = require('async'));
+  if (typeOf(stack) === 'function') {
+    cb = stack;
+    stack = [];
+    options = {};
+  }
+
+  if (typeOf(options) === 'function') {
     cb = options;
     options = {};
   }
 
-  if (typeof stack === 'function') {
-    cb = stack;
-    options = {};
+  if (!Array.isArray(stack)) {
+    options = stack;
     stack = [];
   }
 
-  var fns = this.loadStack(fp, stack, options, 'async');
-  if (!fns || fns.length === 0) {
+  stack = this.buildStack('async', stack);
+
+  var loader = matchLoader(fp, options, this);
+  var fns = union(this.cache.async[loader] || [], stack);
+  if (!fns) {
     return fp;
   }
 
-  var async = require('async');
   async.reduce(fns, fp, function (acc, fn, next) {
     fn(acc, options, next);
   }, cb);
@@ -391,18 +267,25 @@ Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
  */
 
 Loaders.prototype.loadPromise = function(fp, stack, options) {
+  var Promise = requires.promise || (requires.promise = require('bluebird'));
   if (!Array.isArray(stack)) {
     options = stack;
     stack = [];
   }
 
+  var current = Promise.resolve();
   options = options || {};
 
-  var fns = this.loadStack(fp, stack, options, 'promise');
-  var Promise = require('bluebird');
-  var current = Promise.resolve();
+  var loader = matchLoader(fp, options, this);
+  stack = this.buildStack('promise', stack);
 
-  if (!fns || fns.length === 0) return current.then(function () { return fp; });
+  var fns = union(this.cache.promise[loader] || [], stack);
+  if (!fns) {
+    return current.then(function () {
+      return fp;
+    });
+  }
+
   return Promise.reduce(fns, function (acc, fn) {
     return fn(acc, options);
   }, fp);
@@ -429,16 +312,18 @@ Loaders.prototype.loadPromise = function(fp, stack, options) {
  */
 
 Loaders.prototype.loadStream = function(fp, stack, options) {
+  var es = requires.es || (requires.es = require('event-stream'));
   if (!Array.isArray(stack)) {
     options = stack;
     stack = [];
   }
 
-  var es = require('event-stream');
   options = options || {};
+  var loader = matchLoader(fp, options, this);
+  stack = this.buildStack('stream', stack);
 
-  var fns = this.loadStack(fp, stack, options, 'stream');
-  if (!fns || fns.length === 0) {
+  var fns = union(this.cache.stream[loader] || [], stack);
+  if (!fns) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
     });
@@ -481,4 +366,40 @@ function formatExt(ext) {
   return (ext[0] === '.')
     ? ext.slice(1)
     : ext;
+}
+
+/**
+ * Array union util.
+ *
+ * @api private
+ */
+
+function union() {
+  return [].concat.apply([], arguments)
+    .filter(Boolean);
+}
+
+/**
+ * Filter util
+ *
+ * @api private
+ */
+
+function filter(arr, types) {
+  types = !Array.isArray(types)
+    ? [types]
+    : types;
+
+  var len = arr.length;
+  var res = [];
+  var i = 0;
+
+  while (len--) {
+    var ele = arr[i++];
+    if (types.indexOf(typeOf(ele)) !== -1) {
+      res = res.concat(ele);
+    }
+  }
+
+  return res;
 }
