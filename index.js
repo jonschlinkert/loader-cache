@@ -36,8 +36,8 @@ var requires = {};
  * @api public
  */
 
-function Loaders() {
-  this.cache = {};
+function Loaders(cache) {
+  this.cache = cache || {};
 }
 
 /**
