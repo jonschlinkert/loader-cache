@@ -1,8 +1,8 @@
 /*!
  * loader-cache <https://github.com/jonschlinkert/loader-cache>
  *
- * Copyright (c) 2014 Jon Schlinkert, contributors.
- * Licensed under the MIT License
+ * Copyright (c) 2014-2015, Jon Schlinkert.
+ * Licensed under the MIT License.
  */
 
 'use strict';
@@ -10,7 +10,7 @@
 var path = require('path');
 var Promise = require('bluebird');
 var es = require('event-stream');
-var should = require('should');
+require('should');
 var YAML = require('js-yaml');
 var Loaders = require('./');
 var fs = require('fs');

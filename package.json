@@ -7,30 +7,32 @@
     "name": "Jon Schlinkert",
     "url": "https://github.com/jonschlinkert"
   },
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/jonschlinkert/loader-cache.git"
-  },
+  "repository": "jonschlinkert/loader-cache",
   "bugs": {
     "url": "https://github.com/jonschlinkert/loader-cache/issues"
   },
-  "licenses": [
-    {
-      "type": "MIT",
-      "url": "https://github.com/jonschlinkert/loader-cache/blob/master/LICENSE-MIT"
-    }
+  "license": "MIT",
+  "files": [
+    "index.js"
   ],
   "main": "index.js",
   "engines": {
     "node": ">=0.10.0"
   },
   "scripts": {
-    "test": "mocha -R spec"
+    "test": "mocha"
+  },
+  "dependencies": {
+    "arr-flatten": "^0.2.1",
+    "array-slice": "^0.2.2",
+    "async": "^0.9.0",
+    "bluebird": "^2.3.11",
+    "event-stream": "^3.1.7",
+    "kind-of": "^0.1.2"
   },
   "devDependencies": {
     "js-yaml": "^3.2.3",
-    "mocha": "*",
-    "should": "*"
+    "mocha": "*"
   },
   "keywords": [
     "content",
@@ -43,13 +45,5 @@
     "parser",
     "read",
     "reader"
-  ],
-  "dependencies": {
-    "arr-flatten": "^0.2.1",
-    "array-slice": "^0.2.2",
-    "async": "^0.9.0",
-    "bluebird": "^2.3.11",
-    "event-stream": "^3.1.7",
-    "kind-of": "^0.1.2"
-  }
+  ]
 }
