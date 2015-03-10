@@ -7,13 +7,14 @@
 
 'use strict';
 
+/* deps:mocha */
 var path = require('path');
 var Promise = require('bluebird');
 var es = require('event-stream');
-require('should');
 var YAML = require('js-yaml');
 var Loaders = require('./');
 var fs = require('fs');
+require('should');
 
 var loaders;
 
@@ -25,9 +26,7 @@ describe('loaders (sync)', function () {
       return YAML.safeLoad(str);
     });
 
-    loaders.register('yml', function yml(str) {
-      return YAML.safeLoad(str);
-    });
+    loaders.register('yml', ['yaml']);
 
     loaders.register('json', function json(fp) {
       return require(path.resolve(fp));
@@ -37,9 +36,7 @@ describe('loaders (sync)', function () {
       return fs.readFileSync(fp, 'utf8');
     });
 
-    loaders.register('hbs', function hbs(fp) {
-      return fs.readFileSync(fp, 'utf8');
-    });
+    loaders.register('hbs', ['read']);
 
     loaders.register('data', function data(obj) {
       obj.e = 'f';
@@ -397,34 +394,40 @@ describe('loaders stream', function () {
     loaders.cache.stream.foo.length.should.be.eql(4);
   });
 
-  it('should pass the value returned from a stream loader to the next stream loader:', function (done) {
+  it('should pass the value from a stream loader to the next stream loader:', function (done) {
     var foo = es.through(function foo (fp) { this.emit('data', fp); });
     var baz = es.through(function baz (contents) { this.emit('data', contents); });
     loaders.registerStream('bar', foo, ['read'], baz, ['yaml', 'data']);
-    loaders.loadStream('fixtures/a.bar').on('data', function (results) {
-      results.should.eql({c: 'd', e: 'f'});
-    }).on('end', done);
+    loaders.loadStream('fixtures/a.bar')
+      .on('data', function (results) {
+        results.should.eql({c: 'd', e: 'f'});
+      })
+      .on('end', done);
   });
 
-  it('should pass the value returned from a stream loader to the next stream loader:', function (done) {
+  it('should pass the value from a stream loader to the next stream loader:', function (done) {
     loaders.registerStream('bar', ['read', 'yaml', 'data']);
     loaders.loadStream('fixtures/a.bar').on('data', function (results) {
       results.should.eql({c: 'd', e: 'f'});
     }).on('end', done);
   });
 
-  it('should pass the value returned from a stream loader to the next stream loader:', function (done) {
-    loaders.compose('bar', ['read', 'yaml', 'data'], 'stream');
-    loaders.loadStream('fixtures/a.bar').on('data', function (results) {
-      results.should.eql({c: 'd', e: 'f'});
-    }).on('end', done);
-  });
+  it('should pass the value from a stream loader to the next stream loader:', function (done) {
+    loaders.composeStream('bar', ['read', 'yaml', 'data']);
+    loaders.loadStream('fixtures/a.bar')
+      .on('data', function (results) {
+        results.should.eql({c: 'd', e: 'f'});
+      })
+      .on('end', done);
+    });
 
   it('should use stream loaders passed in at load time:', function (done) {
     loaders.compose('bar', ['read', 'yaml'], 'stream');
-    loaders.loadStream('fixtures/a.bar', ['data']).on('data', function (results) {
-      results.should.eql({c: 'd', e: 'f'});
-    }).on('end', done);
+    loaders.loadStream('fixtures/a.bar', ['data'])
+      .on('data', function (results) {
+        results.should.eql({c: 'd', e: 'f'});
+      })
+      .on('end', done);
   });
 
   it('should compose a stream loader from other stream loaders:', function (done) {

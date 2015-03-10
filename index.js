@@ -9,8 +9,6 @@
 
 var path = require('path');
 var typeOf = require('kind-of');
-var slice = require('array-slice');
-var flatten = require('arr-flatten');
 
 /**
  * Expose `Loaders`
@@ -47,7 +45,6 @@ function Loaders(cache) {
  * @param {Function} `fn`
  * @param {String} `type`
  * @return {String}
- * @api private
  */
 
 Loaders.prototype.register = function(/*ext, fns, arr, type*/) {
@@ -85,7 +82,9 @@ Loaders.prototype.registerSync = function(ext, stack, fn) {
  */
 
 Loaders.prototype.registerAsync = function(/*ext, stack, fn*/) {
-  this.register.apply(this, slice(arguments).concat('async'));
+  var i = arguments.length, args = new Array(i);
+  while (i--) args[i] = arguments[i];
+  this.register.apply(this, args.concat('async'));
 };
 
 /**
@@ -102,7 +101,9 @@ Loaders.prototype.registerAsync = function(/*ext, stack, fn*/) {
  */
 
 Loaders.prototype.registerPromise = function(/*ext, stack, fn*/) {
-  this.register.apply(this, slice(arguments).concat('promise'));
+  var i = arguments.length, args = new Array(i);
+  while (i--) args[i] = arguments[i];
+  this.register.apply(this, args.concat('promise'));
 };
 
 /**
@@ -119,7 +120,9 @@ Loaders.prototype.registerPromise = function(/*ext, stack, fn*/) {
  */
 
 Loaders.prototype.registerStream = function(/*ext, stack, fn*/) {
-  this.register.apply(this, slice(arguments).concat('stream'));
+  var i = arguments.length, args = new Array(i);
+  while (i--) args[i] = arguments[i];
+  this.register.apply(this, args.concat('stream'));
 };
 
 /**
@@ -130,17 +133,63 @@ Loaders.prototype.registerStream = function(/*ext, stack, fn*/) {
  * @param {String} `ext` File extension to select the loader or loader stack to use.
  * @param {String} `loaders` Array of loader names.
  * @return {Object} `Loaders` to enable chaining
- * @api private
  */
 
-Loaders.prototype.compose = function(ext/*, stack, fns*/, type) {
-  type = filter(arguments, 'string')[1] || 'sync';
-  var stack = filter(arguments, ['array', 'function', 'object']);
-  stack = this.buildStack(type, stack);
+Loaders.prototype.compose = function(ext/*, stack, fns*/) {
+  var len = arguments.length - 1, i = 1;
+  var stack = [], type;
+
+  while (len--) {
+    var arg = arguments[i++];
+    if (typeof arg === 'string') {
+      type = arg;
+    } else if (arg) {
+      stack.push(arg);
+    }
+  }
+
+  if (typeof type === 'undefined') {
+    type = 'sync';
+  }
 
   this.cache[type] = this.cache[type] || {};
+  stack = this.buildStack(type, stack);
+
   this.cache[type][ext] = union(this.cache[type][ext] || [], stack);
   return this;
+};
+
+/**
+ * Create a from other (previously cached) loaders.
+ *
+ * @param {String} `name` Name of the loader or loader stack to use, usually this is a file extension.
+ * @param {String} `loaders` Array of loader names.
+ * @return {Object} `Loaders` to enable chaining
+ */
+
+Loaders.prototype.composeStream = function() {
+  var fn = this._makeComposer('stream');
+  return fn.apply(fn, arguments);
+};
+
+/**
+ * Internal method for creating composers.
+ *
+ * @param {String} `type` The type of composer to create.
+ * @return {Function} Composer function for the given `type.
+ */
+
+Loaders.prototype._makeComposer = function() {
+  return function () {
+    // don't slice args (for v8 optimizations)
+    var len = arguments.length, i = 0;
+    var args = new Array(i);
+    while (len--) {
+      args[i] = arguments[i++];
+    }
+    args[i] = 'stream';
+    this.compose.apply(this, args);
+  }.bind(this);
 };
 
 /**
@@ -152,15 +201,20 @@ Loaders.prototype.compose = function(ext/*, stack, fns*/, type) {
  */
 
 Loaders.prototype.buildStack = function(type, stack) {
-  return flatten(stack.map(function(name) {
+  var len = stack && stack.length, i = 0;
+  var res = [];
+
+  while (i < len) {
+    var name = stack[i++];
     if (typeOf(name) === 'string') {
-      return this.cache[type][name];
+      res = res.concat(this.cache[type][name]);
+    } else if (typeOf(name) === 'array') {
+      res = res.concat(this.buildStack(type, name));
+    } else {
+      res.push(name);
     }
-    if (typeOf(name) === 'array') {
-      return this.buildStack(type, name);
-    }
-    return name;
-  }.bind(this)));
+  }
+  return res;
 };
 
 /**
@@ -173,28 +227,37 @@ Loaders.prototype.buildStack = function(type, stack) {
  * loaders.load('config.yml');
  * ```
  *
- * @param {String} `fp` File path to load.
+ * @param {String} `val` Value to load, like a file path.
  * @param {String} `options` Options to pass to whatever loaders are defined.
  * @return {String}
  * @api public
  */
 
-Loaders.prototype.load = function(fp, stack, options) {
+Loaders.prototype.load = function(val, stack, options) {
   if (!Array.isArray(stack)) {
-    options = stack;
-    stack = [];
+    options = stack; stack = [];
   }
 
-  var loader = matchLoader(fp, options, this);
+  var loader = matchLoader(val, options, this);
   stack = this.buildStack('sync', stack);
 
-  var fns = union(this.cache.sync[loader] || [], stack);
-  if (!fns) {
-    return fp;
+  var fns = [];
+  if (this.cache.sync.hasOwnProperty(loader)) {
+    fns = fns.concat(this.cache.sync[loader]);
   }
-  return fns.reduce(function (acc, fn) {
-    return fn(acc, options);
-  }, fp);
+
+  if (stack && stack.length) {
+    fns = fns.concat(stack);
+  }
+
+  if (!fns.length) return val;
+  var len = fns.length, i = 0;
+
+  while (len--) {
+    var fn = fns[i++];
+    val = fn(val, options);
+  }
+  return val;
 };
 
 /**
@@ -219,26 +282,22 @@ Loaders.prototype.load = function(fp, stack, options) {
 Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
   var async = requires.async || (requires.async = require('async'));
   if (typeOf(stack) === 'function') {
-    cb = stack;
-    stack = [];
-    options = {};
+    cb = stack; stack = []; options = {};
   }
 
   if (typeOf(options) === 'function') {
-    cb = options;
-    options = {};
+    cb = options; options = {};
   }
 
   if (!Array.isArray(stack)) {
-    options = stack;
-    stack = [];
+    options = stack; stack = [];
   }
 
   stack = this.buildStack('async', stack);
 
   var loader = matchLoader(fp, options, this);
   var fns = union(this.cache.async[loader] || [], stack);
-  if (!fns) {
+  if (!fns.length) {
     return fp;
   }
 
@@ -280,7 +339,7 @@ Loaders.prototype.loadPromise = function(fp, stack, options) {
   stack = this.buildStack('promise', stack);
 
   var fns = union(this.cache.promise[loader] || [], stack);
-  if (!fns) {
+  if (!fns.length) {
     return current.then(function () {
       return fp;
     });
@@ -323,7 +382,7 @@ Loaders.prototype.loadStream = function(fp, stack, options) {
   stack = this.buildStack('stream', stack);
 
   var fns = union(this.cache.stream[loader] || [], stack);
-  if (!fns) {
+  if (!fns.length) {
     var noop = es.through(function (fp) {
       this.emit('data', fp);
     });
@@ -344,7 +403,6 @@ Loaders.prototype.loadStream = function(fp, stack, options) {
  *
  * @param {String} `pattern` By default, this is assumed to be a filepath.
  * @return {Object} Object
- * @api private
  */
 
 function matchLoader(pattern, options, thisArg) {
@@ -359,47 +417,16 @@ function matchLoader(pattern, options, thisArg) {
  *
  * @param {String} `ext`
  * @return {String}
- * @api private
  */
 
 function formatExt(ext) {
-  return (ext[0] === '.')
-    ? ext.slice(1)
-    : ext;
+  return (ext[0] === '.') ? ext.slice(1) : ext;
 }
 
 /**
- * Array union util.
- *
- * @api private
+ * Concat a list of arrays.
  */
 
 function union() {
-  return [].concat.apply([], arguments)
-    .filter(Boolean);
-}
-
-/**
- * Filter util
- *
- * @api private
- */
-
-function filter(arr, types) {
-  types = !Array.isArray(types)
-    ? [types]
-    : types;
-
-  var len = arr.length;
-  var res = [];
-  var i = 0;
-
-  while (len--) {
-    var ele = arr[i++];
-    if (types.indexOf(typeOf(ele)) !== -1) {
-      res = res.concat(ele);
-    }
-  }
-
-  return res;
+  return [].concat.apply([], arguments);
 }
