@@ -8,7 +8,6 @@
 'use strict';
 
 var path = require('path');
-var typeOf = require('kind-of');
 
 /**
  * Expose `Loaders`
@@ -39,8 +38,9 @@ function Loaders(cache) {
 }
 
 /**
- * Register a loader, or compose a loader from other
- * (previously cached) loaders.
+ * Register a loader, or compose a loader from other (previously cached) loaders.
+ *
+ * {%= method("compose") %}
  *
  * @param {String} `ext` File extension to select the loader or loader stack to use.
  * @param {String} `loaders` Array of loader names.
@@ -92,16 +92,15 @@ Loaders.prototype.composer = function(type) {
 };
 
 /**
- * Register the given loader callback `fn` as `ext`. Any arbitrary
- * name can be assigned to a loader, however, the loader will only be
- * called when either:
- *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
- *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ * Register the given loader callback `fn` as `ext`.
+ *
+ * {%= method("composeSync") %}
  *
  * @param {String|Array} `ext` File extension or name of the loader.
  * @param {Function|Array} `fn` A loader function, or create a loader from other others by passing an array of names.
  * @return {Object} `Loaders` to enable chaining
  * @api public
+ *
  */
 
 Loaders.prototype.composeSync = function(/*ext, stack, fn*/) {
@@ -109,11 +108,9 @@ Loaders.prototype.composeSync = function(/*ext, stack, fn*/) {
 };
 
 /**
- * Register the given async loader callback `fn` as `ext`. Any arbitrary
- * name can be assigned to a loader, however, the loader will only be
- * called when either:
- *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
- *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ * Register the given async loader callback `fn` as `ext`.
+ *
+ * {%= method("composeAsync") %}
  *
  * @param {String|Array} `ext` File extension or name of the loader.
  * @param {Function|Array} `fn` A loader function with a callback parameter, or create a loader from other others by passing an array of names.
@@ -126,11 +123,9 @@ Loaders.prototype.composeAsync = function(/*ext, stack, fn*/) {
 };
 
 /**
- * Register the given promise loader callback `fn` as `ext`. Any arbitrary
- * name can be assigned to a loader, however, the loader will only be
- * called when either:
- *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
- *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ * Register the given promise loader callback `fn` as `ext`.
+ *
+ * {%= method("composePromise") %}
  *
  * @param {String|Array} `ext` File extension or name of the loader.
  * @param {Function|Array} `fn` A loader function that returns a promise, or create a loader from other others by passing an array of names.
@@ -143,12 +138,10 @@ Loaders.prototype.composePromise = function(/*ext, stack, fn*/) {
 };
 
 /**
- * Register the given stream loader callback `fn` as `ext`. Any arbitrary
- * name can be assigned to a loader, however, the loader will only be
- * called when either:
- *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
- *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ * Register the given stream loader callback `fn` as `ext`.
  *
+ * {%= method("composeStream") %}
+
  * @param {String|Array} `ext` File extension or name of the loader.
  * @param {Stream|Array} `fn` A stream loader, or create a loader from other others by passing an array of names.
  * @return {Object} `Loaders` to enable chaining
@@ -156,18 +149,6 @@ Loaders.prototype.composePromise = function(/*ext, stack, fn*/) {
  */
 
 Loaders.prototype.composeStream = function(/*ext, stack, fn*/) {
-  this.composer('stream').apply(this, arguments);
-};
-
-/**
- * Create a from other (previously cached) loaders.
- *
- * @param {String} `name` Name of the loader or loader stack to use, usually this is a file extension.
- * @param {String} `loaders` Array of loader names.
- * @return {Object} `Loaders` to enable chaining
- */
-
-Loaders.prototype.composeStream = function() {
   this.composer('stream').apply(this, arguments);
 };
 
@@ -200,12 +181,7 @@ Loaders.prototype.buildStack = function(type, stack) {
 /**
  * Run loaders associated with `ext` of the given filepath.
  *
- * **Example**
- *
- * ```js
- * // this will run the `yml` loader from the `.compose()` example
- * loaders.load('config.yml');
- * ```
+ * {%= method("load") %}
  *
  * @param {String} `val` Value to load, like a file path.
  * @param {String} `options` Options to pass to whatever loaders are defined.
@@ -243,15 +219,8 @@ Loaders.prototype.load = function(val, stack, options) {
 /**
  * Run async loaders associated with `ext` of the given filepath.
  *
- * **Example**
- *
- * ```js
- * // this will run the `yml` async loader from the `.compose()` example
- * loaders.loadAsync('config.yml', function (err, obj) {
- *   // do some async stuff
- * });
- * ```
- *
+ * {%= method("loadAsync") %}
+
  * @param {String} `fp` File path to load.
  * @param {Object} `options` Options to pass to whatever loaders are defined.
  * @param {Function} `cb` Callback to indicate loading has finished
@@ -289,15 +258,7 @@ Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
 /**
  * Run promise loaders associated with `ext` of the given filepath.
  *
- * **Example**
- *
- * ```js
- * // this will run the `yml` promise loader from the `.compose()` example
- * loaders.loadPromise('config.yml')
- *   .then(function (results) {
- *     // do some promise stuff
- *   });
- * ```
+ * {%= method("loadAsync") %}
  *
  * @param {String} `fp` File path to load.
  * @param {Object} `options` Options to pass to whatever loaders are defined.
@@ -333,16 +294,7 @@ Loaders.prototype.loadPromise = function(fp, stack, options) {
 /**
  * Run stream loaders associated with `ext` of the given filepath.
  *
- * **Example**
- *
- * ```js
- * // this will run the `yml` stream loader from the `.compose()` example
- * loaders.LoadStream('config.yml')
- *   .pipe(foo())
- *   .on('data', function (results) {
- *     // do stuff
- *   });
- * ```
+ * {%= method("loadStream") %}
  *
  * @param {String} `fp` File path to load.
  * @param {Object} `options` Options to pass to whatever loaders are defined.
