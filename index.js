@@ -39,96 +39,8 @@ function Loaders(cache) {
 }
 
 /**
- * Base register method used by all other register method.
- *
- * @param {String} `ext`
- * @param {Function} `fn`
- * @param {String} `type`
- * @return {String}
- */
-
-Loaders.prototype.register = function(/*ext, fns, arr, type*/) {
-  return this.compose.apply(this, arguments);
-};
-
-/**
- * Register the given loader callback `fn` as `ext`. Any arbitrary
- * name can be assigned to a loader, however, the loader will only be
- * called when either:
- *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
- *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
- *
- * @param {String|Array} `ext` File extension or name of the loader.
- * @param {Function|Array} `fn` A loader function, or create a loader from other others by passing an array of names.
- * @return {Object} `Loaders` to enable chaining
- * @api public
- */
-
-Loaders.prototype.registerSync = function(ext, stack, fn) {
-  this.register(ext, stack, fn, 'sync');
-};
-
-/**
- * Register the given async loader callback `fn` as `ext`. Any arbitrary
- * name can be assigned to a loader, however, the loader will only be
- * called when either:
- *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
- *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
- *
- * @param {String|Array} `ext` File extension or name of the loader.
- * @param {Function|Array} `fn` A loader function with a callback parameter, or create a loader from other others by passing an array of names.
- * @return {Object} `Loaders` to enable chaining
- * @api public
- */
-
-Loaders.prototype.registerAsync = function(/*ext, stack, fn*/) {
-  var i = arguments.length, args = new Array(i);
-  while (i--) args[i] = arguments[i];
-  this.register.apply(this, args.concat('async'));
-};
-
-/**
- * Register the given promise loader callback `fn` as `ext`. Any arbitrary
- * name can be assigned to a loader, however, the loader will only be
- * called when either:
- *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
- *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
- *
- * @param {String|Array} `ext` File extension or name of the loader.
- * @param {Function|Array} `fn` A loader function that returns a promise, or create a loader from other others by passing an array of names.
- * @return {Object} `Loaders` to enable chaining
- * @api public
- */
-
-Loaders.prototype.registerPromise = function(/*ext, stack, fn*/) {
-  var i = arguments.length, args = new Array(i);
-  while (i--) args[i] = arguments[i];
-  this.register.apply(this, args.concat('promise'));
-};
-
-/**
- * Register the given stream loader callback `fn` as `ext`. Any arbitrary
- * name can be assigned to a loader, however, the loader will only be
- * called when either:
- *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
- *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
- *
- * @param {String|Array} `ext` File extension or name of the loader.
- * @param {Stream|Array} `fn` A stream loader, or create a loader from other others by passing an array of names.
- * @return {Object} `Loaders` to enable chaining
- * @api public
- */
-
-Loaders.prototype.registerStream = function(/*ext, stack, fn*/) {
-  var i = arguments.length, args = new Array(i);
-  while (i--) args[i] = arguments[i];
-  this.register.apply(this, args.concat('stream'));
-};
-
-/**
- * Create a loader from other (previously cached) loaders. For
- * example, you might create a loader like the following:
- *
+ * Register a loader, or compose a loader from other
+ * (previously cached) loaders.
  *
  * @param {String} `ext` File extension to select the loader or loader stack to use.
  * @param {String} `loaders` Array of loader names.
@@ -160,6 +72,94 @@ Loaders.prototype.compose = function(ext/*, stack, fns*/) {
 };
 
 /**
+ * Internal method for creating composers.
+ *
+ * @param {String} `type` The type of composer to create.
+ * @return {Function} Composer function for the given `type.
+ */
+
+Loaders.prototype.composer = function(type) {
+  return function () {
+    // don't slice args (for v8 optimizations)
+    var len = arguments.length, i = 0;
+    var args = new Array(len);
+    while (len--) {
+      args[i] = arguments[i++];
+    }
+    args[i] = type || 'sync';
+    this.compose.apply(this, args);
+  }.bind(this);
+};
+
+/**
+ * Register the given loader callback `fn` as `ext`. Any arbitrary
+ * name can be assigned to a loader, however, the loader will only be
+ * called when either:
+ *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
+ *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ *
+ * @param {String|Array} `ext` File extension or name of the loader.
+ * @param {Function|Array} `fn` A loader function, or create a loader from other others by passing an array of names.
+ * @return {Object} `Loaders` to enable chaining
+ * @api public
+ */
+
+Loaders.prototype.composeSync = function(/*ext, stack, fn*/) {
+  this.composer('sync').apply(this, arguments);
+};
+
+/**
+ * Register the given async loader callback `fn` as `ext`. Any arbitrary
+ * name can be assigned to a loader, however, the loader will only be
+ * called when either:
+ *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
+ *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ *
+ * @param {String|Array} `ext` File extension or name of the loader.
+ * @param {Function|Array} `fn` A loader function with a callback parameter, or create a loader from other others by passing an array of names.
+ * @return {Object} `Loaders` to enable chaining
+ * @api public
+ */
+
+Loaders.prototype.composeAsync = function(/*ext, stack, fn*/) {
+  this.composer('async').apply(this, arguments);
+};
+
+/**
+ * Register the given promise loader callback `fn` as `ext`. Any arbitrary
+ * name can be assigned to a loader, however, the loader will only be
+ * called when either:
+ *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
+ *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ *
+ * @param {String|Array} `ext` File extension or name of the loader.
+ * @param {Function|Array} `fn` A loader function that returns a promise, or create a loader from other others by passing an array of names.
+ * @return {Object} `Loaders` to enable chaining
+ * @api public
+ */
+
+Loaders.prototype.composePromise = function(/*ext, stack, fn*/) {
+  this.composer('promise').apply(this, arguments);
+};
+
+/**
+ * Register the given stream loader callback `fn` as `ext`. Any arbitrary
+ * name can be assigned to a loader, however, the loader will only be
+ * called when either:
+ *   a. `ext` matches the file extension of a path passed to the `.load()` method, or
+ *   b. `ext` is an arbitrary name passed on the loader stack of another loader. Example below.
+ *
+ * @param {String|Array} `ext` File extension or name of the loader.
+ * @param {Stream|Array} `fn` A stream loader, or create a loader from other others by passing an array of names.
+ * @return {Object} `Loaders` to enable chaining
+ * @api public
+ */
+
+Loaders.prototype.composeStream = function(/*ext, stack, fn*/) {
+  this.composer('stream').apply(this, arguments);
+};
+
+/**
  * Create a from other (previously cached) loaders.
  *
  * @param {String} `name` Name of the loader or loader stack to use, usually this is a file extension.
@@ -168,48 +168,28 @@ Loaders.prototype.compose = function(ext/*, stack, fns*/) {
  */
 
 Loaders.prototype.composeStream = function() {
-  var fn = this._makeComposer('stream');
-  return fn.apply(fn, arguments);
+  this.composer('stream').apply(this, arguments);
 };
 
 /**
- * Internal method for creating composers.
- *
- * @param {String} `type` The type of composer to create.
- * @return {Function} Composer function for the given `type.
- */
-
-Loaders.prototype._makeComposer = function() {
-  return function () {
-    // don't slice args (for v8 optimizations)
-    var len = arguments.length, i = 0;
-    var args = new Array(i);
-    while (len--) {
-      args[i] = arguments[i++];
-    }
-    args[i] = 'stream';
-    this.compose.apply(this, args);
-  }.bind(this);
-};
-
-/**
- * Build a stack of loader functions when given a mix of functions and names.
+ * Build a stack of loader functions from functions
+ * and/or names of other cached loaders.
  *
  * @param  {String} `type` Loader type to get loaders from.
  * @param  {Array}  `stack` Stack of loader functions and names.
- * @return {Array}  Resolved loader functions
+ * @return {Array} Array of loader functions
  */
 
 Loaders.prototype.buildStack = function(type, stack) {
   var len = stack && stack.length, i = 0;
   var res = [];
 
-  while (i < len) {
+  while (len--) {
     var name = stack[i++];
-    if (typeOf(name) === 'string') {
+    if (typeof name === 'string') {
       res = res.concat(this.cache[type][name]);
-    } else if (typeOf(name) === 'array') {
-      res = res.concat(this.buildStack(type, name));
+    } else if (Array.isArray(name)) {
+      res.push.apply(res, this.buildStack(type, name));
     } else {
       res.push(name);
     }
@@ -255,7 +235,7 @@ Loaders.prototype.load = function(val, stack, options) {
 
   while (len--) {
     var fn = fns[i++];
-    val = fn(val, options);
+    val = fn.call(this, val, options);
   }
   return val;
 };
@@ -281,11 +261,11 @@ Loaders.prototype.load = function(val, stack, options) {
 
 Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
   var async = requires.async || (requires.async = require('async'));
-  if (typeOf(stack) === 'function') {
+  if (typeof stack === 'function') {
     cb = stack; stack = []; options = {};
   }
 
-  if (typeOf(options) === 'function') {
+  if (typeof options === 'function') {
     cb = options; options = {};
   }
 
@@ -332,7 +312,7 @@ Loaders.prototype.loadPromise = function(fp, stack, options) {
     stack = [];
   }
 
-  var current = Promise.resolve();
+  var resolve = Promise.resolve();
   options = options || {};
 
   var loader = matchLoader(fp, options, this);
@@ -340,7 +320,7 @@ Loaders.prototype.loadPromise = function(fp, stack, options) {
 
   var fns = union(this.cache.promise[loader] || [], stack);
   if (!fns.length) {
-    return current.then(function () {
+    return resolve.then(function () {
       return fp;
     });
   }
@@ -405,9 +385,9 @@ Loaders.prototype.loadStream = function(fp, stack, options) {
  * @return {Object} Object
  */
 
-function matchLoader(pattern, options, thisArg) {
-  if (options && options.matchLoader) {
-    return options.matchLoader(pattern, options, thisArg);
+function matchLoader(pattern, opts, thisArg) {
+  if (opts && opts.matchLoader) {
+    return opts.matchLoader(pattern, opts, thisArg);
   }
   return formatExt(path.extname(pattern));
 }
