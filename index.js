@@ -196,7 +196,6 @@ Loaders.prototype.load = function(val, stack, options) {
 
   var loader = matchLoader(val, options, this);
   stack = this.buildStack('sync', stack);
-
   var fns = [];
   if (this.cache.sync.hasOwnProperty(loader)) {
     fns = fns.concat(this.cache.sync[loader]);
@@ -211,7 +210,7 @@ Loaders.prototype.load = function(val, stack, options) {
 
   while (len--) {
     var fn = fns[i++];
-    val = fn.call(this, val, options);
+    val = fn.apply(this, arrayify(val));
   }
   return val;
 };
@@ -228,7 +227,7 @@ Loaders.prototype.load = function(val, stack, options) {
  * @api public
  */
 
-Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
+Loaders.prototype.loadAsync = function(val, stack, options, cb) {
   var async = requires.async || (requires.async = require('async'));
   if (typeof stack === 'function') {
     cb = stack; stack = []; options = {};
@@ -244,13 +243,13 @@ Loaders.prototype.loadAsync = function(fp, stack, options, cb) {
 
   stack = this.buildStack('async', stack);
 
-  var loader = matchLoader(fp, options, this);
+  var loader = matchLoader(val, options, this);
   var fns = union(this.cache.async[loader] || [], stack);
   if (!fns.length) {
-    return fp;
+    return val;
   }
 
-  async.reduce(fns, fp, function (acc, fn, next) {
+  async.reduce(fns, val, function (acc, fn, next) {
     fn(acc, options, next);
   }, cb);
 };
@@ -361,4 +360,12 @@ function formatExt(ext) {
 
 function union() {
   return [].concat.apply([], arguments);
+}
+
+/**
+ * Cast the given value to an array.
+ */
+
+function arrayify(val) {
+  return Array.isArray(val) ? val : [val];
 }
