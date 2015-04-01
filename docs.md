@@ -23,7 +23,6 @@ loaders.compose('read', function(fp) {
 loaders.compose('yml', ['read', 'yaml']);
 ```
 
-
 ## composeAsync
 
 ```js
@@ -84,4 +83,43 @@ loaders.composeStream('read', function(fp) {
 
 // create a new loader from the `yaml` and `read` loaders.
 loaders.composeStream('yml', ['read', 'yaml']);
+```
+
+
+## load
+
+```js
+// this will run the `yml` loader from the `.compose()` example
+loaders.load('config.yml');
+```
+
+
+## loadAsync
+
+```js
+// this will run the `yml` async loader from the `.compose()` example
+loaders.loadAsync('config.yml', function (err, obj) {
+  // do some async stuff
+});
+```
+
+## loadPromise
+
+```js
+// this will run the `yml` promise loader from the `.compose()` example
+loaders.loadPromise('config.yml')
+  .then(function (results) {
+    // do some promise stuff
+  });
+```
+
+## loadStream
+
+```js
+// this will run the `yml` stream loader from the `.compose()` example
+loaders.LoadStream('config.yml')
+  .pipe(foo())
+  .on('data', function (results) {
+    // do stuff
+  });
 ```
