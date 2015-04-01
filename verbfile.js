@@ -33,8 +33,8 @@ function toSections(fp) {
   return sections;
 }
 
-verb.create('snippet', 'snippets', {isPartial: true}, [toSections]);
-verb.snippets('.verb.md');
+verb.create('method', 'methods', {isPartial: true}, [toSections]);
+verb.methods('docs.md');
 
 /* deps:jshint-stylish */
 verb.task('lint', function () {
@@ -68,7 +68,8 @@ verb.option('toc.ignore', [
 ]);
 
 verb.task('readme', function () {
-  verb.src('.verb.md').pipe(verb.dest('.'));
+  verb.src('.verb.md')
+    .pipe(verb.dest('.'));
 });
 
-verb.task('default', ['test', 'readme']);
+verb.task('default', ['readme']);
