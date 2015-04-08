@@ -189,30 +189,21 @@ Loaders.prototype.buildStack = function(type, stack) {
  * @api public
  */
 
-Loaders.prototype.load = function(val, stack, options) {
-  if (!Array.isArray(stack)) {
-    options = stack; stack = [];
-  }
+Loaders.prototype.load = function(args, loaders, opts, thisArg) {
+  loaders = this.buildStack('sync', loaders);
+  if (opts && opts.matchLoader) {
+    var first = opts.matchLoader(args, opts, this.cache.sync);
+    loaders = first.concat(loaders);
+  };
 
-  var loader = matchLoader(val, options, this);
-  stack = this.buildStack('sync', stack);
-  var fns = [];
-  if (this.cache.sync.hasOwnProperty(loader)) {
-    fns = fns.concat(this.cache.sync[loader]);
-  }
-
-  if (stack && stack.length) {
-    fns = fns.concat(stack);
-  }
-
-  if (!fns.length) return val;
-  var len = fns.length, i = 0;
+  if (!loaders.length) return arrayify(args);
+  var len = loaders.length, i = 0;
 
   while (len--) {
-    var fn = fns[i++];
-    val = fn.apply(this, arrayify(val));
+    args = loaders[i++].apply(thisArg || this, arrayify(args));
   }
-  return val;
+
+  return args;
 };
 
 /**
@@ -328,20 +319,6 @@ Loaders.prototype.loadStream = function(fp, stack, options) {
   });
   return stream;
 };
-
-/**
- * Get a loader based on the given pattern.
- *
- * @param {String} `pattern` By default, this is assumed to be a filepath.
- * @return {Object} Object
- */
-
-function matchLoader(pattern, opts, thisArg) {
-  if (opts && opts.matchLoader) {
-    return opts.matchLoader(pattern, opts, thisArg);
-  }
-  return formatExt(path.extname(pattern));
-}
 
 /**
  * Format extensions.
