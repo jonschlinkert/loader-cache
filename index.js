@@ -34,21 +34,10 @@ var requires = {};
  * @api public
  */
 
-function Loaders(cache, handler) {
+function Loaders(cache) {
   if (!(this instanceof Loaders))
-    return new Loaders(cache, handler);
-
-  if (typeof cache === 'function') {
-    handler = cache;
-    cache = {};
-  }
-
+    return new Loaders(cache);
   this.cache = cache || {};
-  this.middleware = {
-    first: [],
-    last: []
-  };
-  this._handler = handler;
 }
 
 /**
@@ -59,7 +48,7 @@ function Loaders(cache, handler) {
  * @return {Object}
  */
 
-Loaders.prototype.register = function(/*name, stack, fn*/) {
+Loaders.prototype.register = function(name, fn) {
   return this.compose.apply(this, arguments);
 };
 
@@ -74,55 +63,12 @@ Loaders.prototype.register = function(/*name, stack, fn*/) {
  * @return {Object} `Loaders` to enable chaining
  */
 
-Loaders.prototype.compose = function(name, stack, fn) {
-  if (typeof stack === 'function') {
-    fn = stack;
-    stack = [];
-  }
-
-  stack = stack || [];
-  stack = Array.isArray(stack) ? stack : [stack];
-  if (typeof fn === 'function') {
-    stack.push(fn);
-  }
-
+Loaders.prototype.compose = function(name /*, loader names|functions */) {
+  var stack = arrayify(arguments);
+  name = stack.shift();
   stack = this.buildStack(stack);
   this.cache[name] = union(this.cache[name] || [], stack);
   return this;
-};
-
-Loaders.prototype.first = function(fn) {
-  this.middleware.first.push(fn);
-};
-
-Loaders.prototype.last = function(fn) {
-  this.middleware.last.push(fn);
-};
-
-Loaders.prototype.handler = function(handler) {
-  this._handler = handler;
-};
-
-Loaders.prototype.handle = function(verb, stack, args) {
-  switch (verb) {
-    case 'first':
-    case 'last':
-      var len = stack.length, i = 0;
-      var results = null;
-      while (len-- || results != null) {
-        var fn = stack[i++];
-        results = fn.apply(fn, args);
-      }
-      return results;
-      break;
-
-    case 'load':
-      if (typeof this._handler !== 'function') return null;
-      return this._handler(stack, args);
-      break;
-    default:
-      throw new Error('Invalid verb [' + verb + ']');
-  }
 };
 
 /**
@@ -150,31 +96,30 @@ Loaders.prototype.buildStack = function(stack) {
 };
 
 /**
- * Run first middleware, call load function, run last middleware
- *
- * **Example**
+ * Get a loader for the specified loader stack.
  *
  * ```js
- * // this will run the `yml` loader from the `.compose()` example
- * loaders.load('config.yml');
+ * // this will return the `yml` loader from the `.compose()` example
+ * loaders.loader('yml');
  * ```
  *
  * @api public
  */
 
-Loaders.prototype.load = function(/* arguments */) {
-  var first = this.middleware.first;
-  var last = this.middleware.last;
+Loaders.prototype.loader = function(/*name, additional loader names|functions */) {
+  var stack = arrayify(arguments);
+  stack = this.buildStack(stack);
 
-  var len = arguments.length, i = 0;
-  var args = new Array(len);
-  while (len--) args[i] = arguments[i++];
-
-  var arg = this.handle('first', first, args) || args;
-  arg = Array.isArray(arg) ? arg : [arg];
-
-  var results = this.handle('load', this.cache, arg);
-  return this.handle('last', last, results) || results;
+  return function (/* arguments */) {
+    var results = null;
+    var len = stack.length, i = 0;
+    while (len--) {
+      var fn = stack[i++];
+      var args = i === 1 ? arguments : [results];
+      results = fn.apply(fn, args);
+    }
+    return results;
+  };
 };
 
 /**
@@ -183,4 +128,11 @@ Loaders.prototype.load = function(/* arguments */) {
 
 function union() {
   return [].concat.apply([], arguments);
+}
+
+function arrayify (args) {
+  var len = args.length, i = 0;
+  var stack = new Array(len);
+  while (len--) stack[i] = args[i++];
+  return stack;
 }

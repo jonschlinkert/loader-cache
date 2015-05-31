@@ -42,19 +42,6 @@ describe.only('loaders (sync)', function () {
       obj.e = 'f';
       return obj;
     });
-
-    loaders.handler(function (cache, args) {
-      var fp = args[0];
-      var ext = path.extname(fp);
-      if (ext && ext[0] === '.') ext = ext.substr(1);
-      var stack = cache[ext] || [];
-      var len = stack.length, i = 0;
-      var results = fp;
-      while (len--) {
-        results = stack[i++](results);
-      }
-      return results;
-    });
   });
 
   it('should register loaders:', function () {
@@ -89,14 +76,14 @@ describe.only('loaders (sync)', function () {
 
   it('should pass the value returned from a loader to the next loader:', function () {
     loaders.register('bar', ['read', 'yaml', 'data']);
-    loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+    loaders.loader('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 
   it('should pass the value returned from a loader to the next loader:', function () {
     function foo (fp) { return fp; }
     function baz (contents) { return contents; };
     loaders.register('bar', [foo, 'read', baz, 'yaml', 'data']);
-    loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+    loaders.loader('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 
   it('should compose a loader from other loaders and the given function:', function () {
@@ -108,30 +95,19 @@ describe.only('loaders (sync)', function () {
 
   it('should pass the value returned from a loader to the next loader:', function () {
     loaders.compose('bar', ['read', 'yaml', 'data']);
-    loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+    loaders.loader('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 
   it('should use loaders passed in at load time:', function () {
     loaders.compose('bar', ['read', 'yaml']);
-    // loaders.load('fixtures/a.bar', ['data']).should.eql({c: 'd', e: 'f'});
+    loaders.loader('bar', ['data'])('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 
   it('should compose a loader from other loaders:', function () {
     loaders.compose('parse', ['read', 'yaml']);
     loaders.compose('extend', ['data']);
     loaders.compose('bar', ['parse', 'extend']);
-    loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
-  });
-
-  it('should use a custom function for matching loaders:', function () {
-    loaders.compose('parse', ['read', 'yaml']);
-    loaders.compose('extend', ['data']);
-    loaders.compose('bar', ['parse', 'extend']);
-    loaders.load('fixtures/a.bar', {
-      matchLoader: function(pattern) {
-        return path.extname(pattern).slice(1);
-      }
-    }).should.eql({c: 'd', e: 'f'});
+    loaders.loader('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 });
 
