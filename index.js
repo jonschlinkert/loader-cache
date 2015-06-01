@@ -34,15 +34,17 @@ var requires = {};
  * @api public
  */
 
-function Loaders(cache) {
+function Loaders(type, cache) {
   if (!(this instanceof Loaders))
-    return new Loaders(cache);
+    return new Loaders(type, cache);
+  if (typeof type === 'object') {
+    cache = type;
+    type = 'sync';
+  }
   this.cache = cache || {};
+  this.type = type || 'sync';
   this.iterators = {};
-  this.iterator('sync', require('./lib/iterator-sync'));
-  this.iterator('async', require('./lib/iterator-async'));
-  this.iterator('stream', require('./lib/iterator-stream'));
-  this.iterator('promise', require('./lib/iterator-promise'));
+  this.iterator(this.type, require('./lib/iterator-' + this.type));
 }
 
 /**
@@ -115,25 +117,7 @@ Loaders.prototype.buildStack = function(stack) {
 Loaders.prototype.loader = function(/*name, additional loader names|functions */) {
   var stack = arrayify(arguments);
   stack = this.buildStack(stack);
-  return this.iterator('sync')(stack);
-};
-
-Loaders.prototype.loaderAsync = function(/*name, additional loader names|functions */) {
-  var stack = arrayify(arguments);
-  stack = this.buildStack(stack);
-  return this.iterator('async')(stack);
-};
-
-Loaders.prototype.loaderStream = function(/*name, additional loader names|functions */) {
-  var stack = arrayify(arguments);
-  stack = this.buildStack(stack);
-  return this.iterator('stream')(stack);
-};
-
-Loaders.prototype.loaderPromise = function(/*name, additional loader names|functions */) {
-  var stack = arrayify(arguments);
-  stack = this.buildStack(stack);
-  return this.iterator('promise')(stack);
+  return this.iterator(this.type)(stack);
 };
 
 Loaders.prototype.iterator = function(type, fn) {

@@ -113,7 +113,7 @@ describe('loaders (sync)', function () {
 
 describe('loaders async', function () {
   beforeEach(function() {
-    loaders = new Loaders();
+    loaders = new Loaders('async');
 
     loaders.register('yaml', function yaml(str, next) {
       next(null, YAML.safeLoad(str));
@@ -174,7 +174,7 @@ describe('loaders async', function () {
 
   it('should pass the value returned from an async loader to the next async loader:', function (done) {
     loaders.register('bar', ['read', 'yaml', 'data']);
-    loaders.loaderAsync('bar')('fixtures/a.bar', function (err, obj) {
+    loaders.loader('bar')('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -184,7 +184,7 @@ describe('loaders async', function () {
     function foo (fp, next) { next(null, fp); }
     function baz (contents, next) { next(null, contents); };
     loaders.register('bar', foo, ['read'], baz, ['yaml', 'data']);
-    loaders.loaderAsync('bar')('fixtures/a.bar', function (err, obj) {
+    loaders.loader('bar')('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -192,7 +192,7 @@ describe('loaders async', function () {
 
   it('should pass the value returned from an async loader to the next async loader:', function (done) {
     loaders.compose('bar', ['read', 'yaml', 'data']);
-    loaders.loaderAsync('bar')('fixtures/a.bar', function (err, obj) {
+    loaders.loader('bar')('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -200,7 +200,7 @@ describe('loaders async', function () {
 
   it('should use async loaders passed in at load time:', function (done) {
     loaders.compose('bar', ['read', 'yaml']);
-    loaders.loaderAsync('bar', ['data'])('fixtures/a.bar', function (err, obj) {
+    loaders.loader('bar', ['data'])('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -210,7 +210,7 @@ describe('loaders async', function () {
     loaders.compose('parse', ['read', 'yaml']);
     loaders.compose('extend', ['data']);
     loaders.compose('bar', ['parse', 'extend']);
-    loaders.loaderAsync('bar')('fixtures/a.bar', function (err, obj) {
+    loaders.loader('bar')('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -219,7 +219,7 @@ describe('loaders async', function () {
 
 describe('loaders promise', function () {
   beforeEach(function() {
-    loaders = new Loaders();
+    loaders = new Loaders('promise');
 
     loaders.register('yaml', Promise.method(function yaml(str) {
       return YAML.safeLoad(str);
@@ -281,7 +281,7 @@ describe('loaders promise', function () {
     var foo = Promise.method(function foo (fp) { return fp; });
     var baz = Promise.method(function baz (contents) { return contents; });
     loaders.register('bar', foo, ['read'], baz, ['yaml', 'data']);
-    loaders.loaderPromise('bar')('fixtures/a.bar').then(function (results) {
+    loaders.loader('bar')('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -289,7 +289,7 @@ describe('loaders promise', function () {
 
   it('should pass the value returned from a promise loader to the next promise loader:', function (done) {
     loaders.register('bar', ['read', 'yaml', 'data']);
-    loaders.loaderPromise('bar')('fixtures/a.bar').then(function (results) {
+    loaders.loader('bar')('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -297,7 +297,7 @@ describe('loaders promise', function () {
 
   it('should pass the value returned from a promise loader to the next promise loader:', function (done) {
     loaders.compose('bar', ['read', 'yaml', 'data']);
-    loaders.loaderPromise('bar')('fixtures/a.bar').then(function (results) {
+    loaders.loader('bar')('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -305,7 +305,7 @@ describe('loaders promise', function () {
 
   it('should use promise loaders passed in at load time:', function (done) {
     loaders.compose('bar', ['read', 'yaml']);
-    loaders.loaderPromise('bar', ['data'])('fixtures/a.bar').then(function (results) {
+    loaders.loader('bar', ['data'])('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -315,7 +315,7 @@ describe('loaders promise', function () {
     loaders.compose('parse', ['read', 'yaml']);
     loaders.compose('extend', ['data']);
     loaders.compose('bar', ['parse', 'extend']);
-    loaders.loaderPromise('bar')('fixtures/a.bar').then(function (results) {
+    loaders.loader('bar')('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -325,7 +325,7 @@ describe('loaders promise', function () {
 
 describe('loaders stream', function () {
   beforeEach(function() {
-    loaders = new Loaders();
+    loaders = new Loaders('stream');
 
     loaders.register('yaml', es.through(function yaml(str) {
       this.emit('data', YAML.safeLoad(str));
@@ -387,7 +387,7 @@ describe('loaders stream', function () {
     var foo = es.through(function foo (fp) { this.emit('data', fp); });
     var baz = es.through(function baz (contents) { this.emit('data', contents); });
     loaders.register('bar', foo, ['read'], baz, ['yaml', 'data']);
-    loaders.loaderStream('bar')('fixtures/a.bar')
+    loaders.loader('bar')('fixtures/a.bar')
       .on('data', function (results) {
         results.should.eql({c: 'd', e: 'f'});
       })
@@ -396,14 +396,14 @@ describe('loaders stream', function () {
 
   it('should pass the value from a stream loader to the next stream loader:', function (done) {
     loaders.register('bar', ['read', 'yaml', 'data']);
-    loaders.loaderStream('bar')('fixtures/a.bar').on('data', function (results) {
+    loaders.loader('bar')('fixtures/a.bar').on('data', function (results) {
       results.should.eql({c: 'd', e: 'f'});
     }).on('end', done);
   });
 
   it('should pass the value from a stream loader to the next stream loader:', function (done) {
     loaders.compose('bar', ['read', 'yaml', 'data']);
-    loaders.loaderStream('bar')('fixtures/a.bar')
+    loaders.loader('bar')('fixtures/a.bar')
       .on('data', function (results) {
         results.should.eql({c: 'd', e: 'f'});
       })
@@ -412,7 +412,7 @@ describe('loaders stream', function () {
 
   it('should use stream loaders passed in at load time:', function (done) {
     loaders.compose('bar', ['read', 'yaml']);
-    loaders.loaderStream('bar', ['data'])('fixtures/a.bar')
+    loaders.loader('bar', ['data'])('fixtures/a.bar')
       .on('data', function (results) {
         results.should.eql({c: 'd', e: 'f'});
       })
@@ -423,7 +423,7 @@ describe('loaders stream', function () {
     loaders.compose('parse', ['read', 'yaml']);
     loaders.compose('extend', ['data']);
     loaders.compose('bar', ['parse', 'extend']);
-    loaders.loaderStream('bar')('fixtures/a.bar').on('data', function (results) {
+    loaders.loader('bar')('fixtures/a.bar').on('data', function (results) {
       results.should.eql({c: 'd', e: 'f'});
     }).on('end', done);
   });
