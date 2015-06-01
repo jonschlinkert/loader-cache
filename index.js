@@ -38,6 +38,11 @@ function Loaders(cache) {
   if (!(this instanceof Loaders))
     return new Loaders(cache);
   this.cache = cache || {};
+  this.iterators = {};
+  this.iterator('sync', require('./lib/iterator-sync'));
+  this.iterator('async', require('./lib/iterator-async'));
+  this.iterator('stream', require('./lib/iterator-stream'));
+  this.iterator('promise', require('./lib/iterator-promise'));
 }
 
 /**
@@ -68,6 +73,7 @@ Loaders.prototype.compose = function(name /*, loader names|functions */) {
   name = stack.shift();
   stack = this.buildStack(stack);
   this.cache[name] = union(this.cache[name] || [], stack);
+  // console.log(name, this.cache[name]);
   return this;
 };
 
@@ -109,17 +115,38 @@ Loaders.prototype.buildStack = function(stack) {
 Loaders.prototype.loader = function(/*name, additional loader names|functions */) {
   var stack = arrayify(arguments);
   stack = this.buildStack(stack);
+  return this.iterator('sync')(stack);
+};
 
-  return function (/* arguments */) {
-    var results = null;
-    var len = stack.length, i = 0;
-    while (len--) {
-      var fn = stack[i++];
-      var args = i === 1 ? arguments : [results];
-      results = fn.apply(fn, args);
-    }
-    return results;
-  };
+Loaders.prototype.loaderAsync = function(/*name, additional loader names|functions */) {
+  var stack = arrayify(arguments);
+  stack = this.buildStack(stack);
+  return this.iterator('async')(stack);
+};
+
+Loaders.prototype.loaderStream = function(/*name, additional loader names|functions */) {
+  var stack = arrayify(arguments);
+  stack = this.buildStack(stack);
+  return this.iterator('stream')(stack);
+};
+
+Loaders.prototype.loaderPromise = function(/*name, additional loader names|functions */) {
+  var stack = arrayify(arguments);
+  stack = this.buildStack(stack);
+  return this.iterator('promise')(stack);
+};
+
+Loaders.prototype.iterator = function(type, fn) {
+  if (arguments.length === 0) return this.iterators;
+  if (arguments.length === 1) return this.iterators[type];
+  if (typeof type !== 'string') {
+    throw new Error('Expected `type` to be of type [string] but got [' + (typeof type) + ']');
+  }
+  if (typeof fn !== 'function') {
+    throw new Error('Expected `fn` to be type [function] but got [' + (typeof fn) + ']')
+  }
+  this.iterators[type] = fn;
+  return this;
 };
 
 /**
