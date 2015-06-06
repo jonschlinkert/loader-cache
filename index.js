@@ -34,16 +34,17 @@ var requires = {};
  * @api public
  */
 
-function Loaders(type, cache) {
+function Loaders(type, options) {
   if (!(this instanceof Loaders)) {
-    return new Loaders(type, cache);
+    return new Loaders(type, options);
   }
   if (typeof type === 'object') {
-    cache = type;
+    options = type;
     type = 'sync';
   }
-  this.cache = cache || {};
-  this.type = type || 'sync';
+  this.options = options || {};
+  this.type = type || this.options.type || 'sync';
+  this.cache = this.options.cache || {};
   this.iterators = {};
   this.iterator(this.type, require('./lib/iterator-' + this.type));
 }
