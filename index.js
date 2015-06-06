@@ -71,11 +71,10 @@ Loaders.prototype.register = function(name, fn) {
  */
 
 Loaders.prototype.compose = function(name /*, loader names|functions */) {
-  var stack = arrayify(arguments);
+  var stack = [].slice.call(arguments);
   name = stack.shift();
   stack = this.buildStack(stack);
   this.cache[name] = union(this.cache[name] || [], stack);
-  // console.log(name, this.cache[name]);
   return this;
 };
 
@@ -89,13 +88,12 @@ Loaders.prototype.compose = function(name /*, loader names|functions */) {
 Loaders.prototype.buildStack = function(stack) {
   var len = stack && stack.length, i = 0;
   var res = [];
-
   while (i < len) {
     var name = stack[i++];
     if (typeOf(name) === 'string') {
       res = res.concat(this.cache[name]);
-    } else if (typeOf(name) === 'array') {
-      res = res.concat(this.buildStack(name));
+    } else if (Array.isArray(name)) {
+      res.push.apply(res, this.buildStack(name));
     } else {
       res.push(name);
     }
@@ -115,9 +113,9 @@ Loaders.prototype.buildStack = function(stack) {
  */
 
 Loaders.prototype.loader = function(/*name, additional loader names|functions */) {
-  var stack = arrayify(arguments);
+  var stack = [].slice.call(arguments);
   stack = this.buildStack(stack);
-  return this.iterator(this.type)(stack);
+  return this.iterator(this.type)(this, stack);
 };
 
 Loaders.prototype.iterator = function(type, fn) {
@@ -139,11 +137,4 @@ Loaders.prototype.iterator = function(type, fn) {
 
 function union() {
   return [].concat.apply([], arguments);
-}
-
-function arrayify (args) {
-  var len = args.length, i = 0;
-  var stack = new Array(len);
-  while (len--) stack[i] = args[i++];
-  return stack;
 }

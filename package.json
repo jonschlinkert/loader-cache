@@ -30,6 +30,8 @@
     "kind-of": "^0.1.2"
   },
   "devDependencies": {
+    "extend-shallow": "^1.1.4",
+    "glob": "^5.0.10",
     "js-yaml": "^3.2.3",
     "mocha": "*",
     "should": "^5.0.1"

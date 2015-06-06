@@ -9,6 +9,8 @@
 
 /* deps:mocha */
 var path = require('path');
+var glob = require('glob');
+var extend = require('extend-shallow');
 var Promise = require('bluebird');
 var es = require('event-stream');
 var YAML = require('js-yaml');
@@ -84,6 +86,26 @@ describe('loaders (sync)', function () {
     function baz (contents) { return contents; };
     loaders.register('bar', [foo, 'read', baz, 'yaml', 'data']);
     loaders.loader('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+  });
+
+  it('should expose the loader instance as `this` in loaders:', function () {
+    loaders.register('a', function a(fp) {
+      return fs.readFileSync(fp, 'utf8');
+    });
+    loaders.register('b', function b(fp) {
+      return YAML.load(this.loader('a')(fp));
+    });
+    loaders.register('c', function c(pattern) {
+      return glob.sync(pattern);
+    });
+    loaders.register('d', ['c'], function d(files) {
+      return files.map(this.loader('b'));
+    });
+    loaders.register('e', function e(arr) {
+      return extend.apply(extend, [{}].concat(arr));
+    });
+    loaders.register('parse', ['d', 'e']);
+    loaders.loader('parse')('fixtures/*.txt').should.eql({c: 'd', e: 'f'});
   });
 
   it('should compose a loader from other loaders and the given function:', function () {
