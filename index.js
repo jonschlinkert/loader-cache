@@ -35,8 +35,9 @@ var requires = {};
  */
 
 function Loaders(type, cache) {
-  if (!(this instanceof Loaders))
+  if (!(this instanceof Loaders)) {
     return new Loaders(type, cache);
+  }
   if (typeof type === 'object') {
     cache = type;
     type = 'sync';
