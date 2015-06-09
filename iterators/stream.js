@@ -15,7 +15,7 @@ module.exports = function iteratorStream(stack) {
     while (len--) {
       var fn = stack[i++];
       if (typeof fn === 'function') {
-        stack[i - 1] = es.through(fn);
+        stack[i - 1] = fn();
       }
     }
     var stream = es.pipe.apply(es, stack);

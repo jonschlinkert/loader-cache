@@ -9,6 +9,9 @@
 
 var path = require('path');
 var typeOf = require('kind-of');
+var flatten = require('arr-flatten');
+var isStream = require('is-stream');
+var iterators = require('./iterators');
 
 /**
  * Expose `Loaders`
@@ -34,31 +37,36 @@ var requires = {};
  * @api public
  */
 
-function Loaders(type, options) {
+function Loaders(options) {
   if (!(this instanceof Loaders)) {
-    return new Loaders(type, options);
+    return new Loaders(options);
   }
-  if (typeof type === 'object') {
-    options = type;
-    type = 'sync';
-  }
-  this.options = options || {};
-  this.type = type || this.options.type || 'sync';
-  this.cache = this.options.cache || {};
-  this.iterators = {};
-  this.iterator(this.type, require('./lib/iterator-' + this.type));
+
+  options = options || {};
+  this.type = options.type || 'sync';
+  this.cache = options.cache || {};
+  this.iterators = options.iterators || {};
+  this.init();
 }
 
 /**
- * Register a loader
- *
- * @param {String} `name`
- * @param {Function} `fn`
- * @return {Object}
+ * Initialize built-in iterators
  */
 
-Loaders.prototype.register = function(name, fn) {
-  return this.compose.apply(this, arguments);
+Loaders.prototype.init = function() {
+  this.iterator(this.type, iterators[this.type]);
+};
+
+/**
+ * Get a loader stack from the cache.
+ *
+ * @param {String} `name`
+ * @return {Object}
+ * @api public
+ */
+
+Loaders.prototype.getStack = function(name) {
+  return this.cache[name] || [];
 };
 
 /**
@@ -66,77 +74,107 @@ Loaders.prototype.register = function(name, fn) {
  * example, you might create a loader like the following:
  *
  *
- * @param {String} `name` File extension to select the loader or loader stack to use.
+ * @param {String} `name` Name of the loader or loader stack to use.
  * @param {Array} `stack` Array of loader names.
  * @param {Function} `fn` Optional loader function
  * @return {Object} `Loaders` to enable chaining
  */
 
-Loaders.prototype.compose = function(name /*, loader names|functions */) {
-  var stack = [].slice.call(arguments);
-  name = stack.shift();
-  stack = this.buildStack(stack);
-  this.cache[name] = union(this.cache[name] || [], stack);
+Loaders.prototype.register = function(name) {
+  var args = [].slice.call(arguments, 1);
+  var cached = this.getStack(name);
+  var stack = this.buildStack(args).stack;
+  this.cache[name] = cached.concat(stack);
   return this;
 };
 
 /**
- * Build a stack of loader functions when given a mix of functions and names.
+ * Build a loader stack from a mix of functions and loader names.
  *
- * @param  {Array}  `stack` Stack of loader functions and names.
- * @return {Array}  Resolved loader functions
+ * @param  {Array} `stack` array of loader functions and names.
+ * @return {Array} Resolved loader functions
+ * @api public
  */
 
-Loaders.prototype.buildStack = function(stack) {
-  var len = stack && stack.length, i = 0;
-  var res = [];
-  while (i < len) {
-    var name = stack[i++];
-    if (typeOf(name) === 'string') {
-      res = res.concat(this.cache[name]);
-    } else if (Array.isArray(name)) {
-      res.push.apply(res, this.buildStack(name));
+Loaders.prototype.buildStack = function(args, cache) {
+  if (!Array.isArray(args)) {
+    throw new TypeError('Loaders#buildStack expects an array.');
+  }
+
+  var len = args.length, i = 0;
+  var stack = [], other = [];
+  cache = cache || this.cache;
+
+  while (len--) {
+    var arg = args[i++];
+    var type = typeOf(arg);
+
+    if (type === 'string' && cache[arg]) {
+      stack.push(cache[arg]);
+    } else if (type === 'function') {
+      stack.push(arg);
+    } else if (type === 'array') {
+      stack.push.apply(stack, this.buildStack(arg, cache).stack);
+    } else if (isStream(arg)) {
+      stack.push(arg);
     } else {
-      res.push(name);
+      other.push(arg);
     }
   }
+
+  var res = {};
+  res.stack = flatten(stack);
+  res.args = other;
   return res;
 };
 
 /**
- * Get a loader for the specified loader stack.
+ * Register an iterator function for the given `type`. If
+ * only the `name` is passed, a cached iterator function will
+ * be returned.
  *
- * ```js
- * // this will return the `yml` loader from the `.compose()` example
- * loaders.loader('yml');
- * ```
- *
+ * @param  {String} `type`
+ * @param  {Function} `fn`
+ * @return {Object} `Loaders` for chaining
  * @api public
  */
 
-Loaders.prototype.loader = function(/*name, additional loader names|functions */) {
-  var stack = [].slice.call(arguments);
-  stack = this.buildStack(stack);
-  return this.iterator(this.type)(this, stack);
-};
-
-Loaders.prototype.iterator = function(type, fn) {
+Loaders.prototype.iterator = function(name, fn) {
   if (arguments.length === 0) return this.iterators;
-  if (arguments.length === 1) return this.iterators[type];
-  if (typeof type !== 'string') {
-    throw new Error('Expected `type` to be of type [string] but got [' + (typeof type) + ']');
+  if (typeof name !== 'string') {
+    throw new Error('Loaders#iterator expects `name` to be a string: ' + name);
+  }
+  if (arguments.length === 1) {
+    if (!this.iterators.hasOwnProperty(name)) {
+      throw new Error('Loaders#iterator: iterator "' + name + '" does not exist.');
+    }
+    return this.iterators[name];
   }
   if (typeof fn !== 'function') {
-    throw new Error('Expected `fn` to be type [function] but got [' + (typeof fn) + ']')
+    throw new Error('Loaders#iterator expects `fn` to be a function: ' + fn);
   }
-  this.iterators[type] = fn;
+  this.iterators[name] = fn;
   return this;
 };
 
 /**
- * Concat a list of arrays.
+ * Compose a loader function from the given functions and/or
+ * the names of cached loader functions.
+ *
+ * ```js
+ * // this will return a function from the given loaders
+ * // and function
+ * loaders.compose(['a', 'b', 'c'], function(val) {
+ *   //=> do stuff to val
+ * });
+ * ```
+ * @param {String} `name` The name of the loader stack to compose.
+ * @return {Function} Returns a function to use for loading.
+ * @api public
  */
 
-function union() {
-  return [].concat.apply([], arguments);
-}
+Loaders.prototype.compose = function() {
+  var fns = this.buildStack([].slice.call(arguments)).stack;
+  return this.iterator(this.type).call(this, fns);
+};
+
