@@ -11,7 +11,6 @@ var path = require('path');
 var typeOf = require('kind-of');
 var flatten = require('arr-flatten');
 var isStream = require('is-stream');
-var iterators = require('./iterators');
 
 /**
  * Expose `Loaders`
@@ -41,21 +40,10 @@ function Loaders(options) {
   if (!(this instanceof Loaders)) {
     return new Loaders(options);
   }
-
   options = options || {};
-  this.type = options.type || 'sync';
   this.cache = options.cache || {};
-  this.iterators = options.iterators || {};
-  this.init();
+  this.iterator = options.iterator;
 }
-
-/**
- * Initialize built-in iterators
- */
-
-Loaders.prototype.init = function() {
-  this.iterator(this.type, iterators[this.type]);
-};
 
 /**
  * Get a loader stack from the cache.
@@ -80,7 +68,7 @@ Loaders.prototype.getStack = function(name) {
  * @return {Object} `Loaders` to enable chaining
  */
 
-Loaders.prototype.register = function(name) {
+Loaders.prototype.register = function(name, loaders) {
   var args = [].slice.call(arguments, 1);
   var cached = this.getStack(name);
   var stack = this.buildStack(args).stack;
@@ -129,35 +117,6 @@ Loaders.prototype.buildStack = function(args, cache) {
 };
 
 /**
- * Register an iterator function for the given `type`. If
- * only the `name` is passed, a cached iterator function will
- * be returned.
- *
- * @param  {String} `type`
- * @param  {Function} `fn`
- * @return {Object} `Loaders` for chaining
- * @api public
- */
-
-Loaders.prototype.iterator = function(name, fn) {
-  if (arguments.length === 0) return this.iterators;
-  if (typeof name !== 'string') {
-    throw new Error('Loaders#iterator expects `name` to be a string: ' + name);
-  }
-  if (arguments.length === 1) {
-    if (!this.iterators.hasOwnProperty(name)) {
-      throw new Error('Loaders#iterator: iterator "' + name + '" does not exist.');
-    }
-    return this.iterators[name];
-  }
-  if (typeof fn !== 'function') {
-    throw new Error('Loaders#iterator expects `fn` to be a function: ' + fn);
-  }
-  this.iterators[name] = fn;
-  return this;
-};
-
-/**
  * Compose a loader function from the given functions and/or
  * the names of cached loader functions.
  *
@@ -175,6 +134,6 @@ Loaders.prototype.iterator = function(name, fn) {
 
 Loaders.prototype.compose = function() {
   var fns = this.buildStack([].slice.call(arguments)).stack;
-  return this.iterator(this.type).call(this, fns);
+  return this.iterator.call(this, fns);
 };
 
