@@ -118,7 +118,7 @@ Loaders.prototype.buildStack = function(args, cache) {
 
 /**
  * Compose a loader function from the given functions and/or
- * the names of cached loader functions.
+ * the names of loaders.
  *
  * ```js
  * // this will return a function from the given loaders
@@ -127,13 +127,14 @@ Loaders.prototype.buildStack = function(args, cache) {
  *   //=> do stuff to val
  * });
  * ```
- * @param {String} `name` The name of the loader stack to compose.
+ * @param {String|Array|Function} `loader(s)` String, list or array of loader names or functions, in any combination or order.
  * @return {Function} Returns a function to use for loading.
  * @api public
  */
 
 Loaders.prototype.compose = function() {
-  var fns = this.buildStack([].slice.call(arguments)).stack;
+  var args = [].slice.call(arguments);
+  var fns = this.buildStack(args).stack;
   return this.iterator.call(this, fns);
 };
 

@@ -22,14 +22,13 @@ var loaders;
 
 describe('loaders (sync)', function () {
   beforeEach(function() {
-    loaders = new Loaders();
+    loaders = new Loaders({iterator: require('iterator-sync')});
 
     loaders.register('yaml', function yaml(str) {
       return YAML.safeLoad(str);
     });
 
     loaders.register('yml', ['yaml']);
-
     loaders.register('json', function json(fp) {
       return require(path.resolve(fp));
     });
@@ -137,7 +136,7 @@ describe('loaders (sync)', function () {
 
 describe('loaders async', function () {
   beforeEach(function() {
-    loaders = new Loaders({type: 'async'});
+    loaders = new Loaders({iterator: require('iterator-async')});
 
     loaders.register('yaml', function yaml(str, next) {
       next(null, YAML.safeLoad(str));
@@ -243,7 +242,7 @@ describe('loaders async', function () {
 
 describe('loaders promise', function () {
   beforeEach(function() {
-    loaders = new Loaders({type: 'promise'});
+    loaders = new Loaders({iterator: require('iterator-promise')});
 
     loaders.register('yaml', Promise.method(function yaml(str) {
       return YAML.safeLoad(str);
@@ -349,7 +348,7 @@ describe('loaders promise', function () {
 
 describe('loaders stream', function () {
   beforeEach(function() {
-    loaders = new Loaders({type: 'stream'});
+    loaders = new Loaders({iterator: require('iterator-streams')});
 
     loaders.register('yaml', es.through(function yaml(str) {
       this.emit('data', YAML.safeLoad(str));
