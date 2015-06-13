@@ -1,7 +1,7 @@
 {
   "name": "loader-cache",
   "description": "Register loader functions that dynamically read, parse or otherwise transform file contents when the name of the loader matches a file extension. You can also compose loaders from other loaders.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "homepage": "https://github.com/jonschlinkert/loader-cache",
   "author": {
     "name": "Jon Schlinkert",
@@ -25,18 +25,28 @@
   },
   "dependencies": {
     "arr-flatten": "^1.0.1",
-    "bluebird": "^2.3.11",
-    "event-stream": "^3.1.7",
-    "export-files": "^2.0.1",
+    "bluebird": "^2.9.27",
+    "event-stream": "^3.3.1",
     "is-stream": "^1.0.1",
-    "kind-of": "^0.1.2"
+    "kind-of": "^2.0.0"
   },
   "devDependencies": {
     "extend-shallow": "^1.1.4",
     "glob": "^5.0.10",
+    "gulp-istanbul": "^0.10.0",
+    "gulp-jshint": "^1.11.0",
+    "gulp-mocha": "^2.1.1",
+    "gulp-util": "^3.0.5",
+    "iterator-async": "^0.1.0",
+    "iterator-promise": "^0.1.0",
+    "iterator-streams": "^0.1.0",
+    "iterator-sync": "^0.1.0",
     "js-yaml": "^3.2.3",
+    "jshint-stylish": "^2.0.0",
     "mocha": "*",
-    "should": "^5.0.1"
+    "should": "^5.0.1",
+    "strip-ansi": "^2.0.1",
+    "verb": "^0.8.6"
   },
   "keywords": [
     "content",
