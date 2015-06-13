@@ -8,6 +8,9 @@
 'use strict';
 
 var path = require('path');
+var typeOf = require('kind-of');
+var flatten = require('arr-flatten');
+var isStream = require('is-stream');
 
 /**
  * Expose `Loaders`
@@ -33,339 +36,104 @@ var requires = {};
  * @api public
  */
 
-function Loaders(cache) {
-  this.cache = cache || {};
+function Loaders(options) {
+  if (!(this instanceof Loaders)) {
+    return new Loaders(options);
+  }
+  options = options || {};
+  this.cache = options.cache || {};
+  this.iterator = options.iterator;
 }
 
 /**
- * Register a loader, or compose a loader from other (previously cached) loaders.
+ * Get a loader stack from the cache.
  *
- * {%= method("compose") %}
+ * @param {String} `name`
+ * @return {Object}
+ * @api public
+ */
+
+Loaders.prototype.getStack = function(name) {
+  return this.cache[name] || [];
+};
+
+/**
+ * Create a loader from other (previously cached) loaders. For
+ * example, you might create a loader like the following:
  *
- * @param {String} `ext` File extension to select the loader or loader stack to use.
- * @param {String} `loaders` Array of loader names.
+ *
+ * @param {String} `name` Name of the loader or loader stack to use.
+ * @param {Array} `stack` Array of loader names.
+ * @param {Function} `fn` Optional loader function
  * @return {Object} `Loaders` to enable chaining
  */
 
-Loaders.prototype.compose = function(ext/*, stack, fns*/) {
-  var len = arguments.length - 1, i = 1;
-  var stack = [], type;
-
-  while (len--) {
-    var arg = arguments[i++];
-    if (typeof arg === 'string') {
-      type = arg;
-    } else if (arg) {
-      stack.push(arg);
-    }
-  }
-
-  if (typeof type === 'undefined') {
-    type = 'sync';
-  }
-
-  this.cache[type] = this.cache[type] || {};
-  stack = this.buildStack(type, stack);
-
-  this.cache[type][ext] = union(this.cache[type][ext] || [], stack);
+Loaders.prototype.register = function(name, loaders) {
+  var args = [].slice.call(arguments, 1);
+  var cached = this.getStack(name);
+  var stack = this.buildStack(args).stack;
+  this.cache[name] = cached.concat(stack);
   return this;
 };
 
 /**
- * Internal method for creating composers.
+ * Build a loader stack from a mix of functions and loader names.
  *
- * @param {String} `type` The type of composer to create.
- * @return {Function} Composer function for the given `type.
- */
-
-Loaders.prototype.composer = function(type) {
-  return function () {
-    // don't slice args (for v8 optimizations)
-    var len = arguments.length, i = 0;
-    var args = new Array(len);
-    while (len--) {
-      args[i] = arguments[i++];
-    }
-    args[i] = type || 'sync';
-    this.compose.apply(this, args);
-  }.bind(this);
-};
-
-/**
- * Register the given loader callback `fn` as `ext`.
- *
- * {%= method("composeSync") %}
- *
- * @param {String|Array} `ext` File extension or name of the loader.
- * @param {Function|Array} `fn` A loader function, or create a loader from other others by passing an array of names.
- * @return {Object} `Loaders` to enable chaining
- * @api public
- *
- */
-
-Loaders.prototype.composeSync = function(/*ext, stack, fn*/) {
-  this.composer('sync').apply(this, arguments);
-};
-
-/**
- * Register the given async loader callback `fn` as `ext`.
- *
- * {%= method("composeAsync") %}
- *
- * @param {String|Array} `ext` File extension or name of the loader.
- * @param {Function|Array} `fn` A loader function with a callback parameter, or create a loader from other others by passing an array of names.
- * @return {Object} `Loaders` to enable chaining
+ * @param  {Array} `stack` array of loader functions and names.
+ * @return {Array} Resolved loader functions
  * @api public
  */
 
-Loaders.prototype.composeAsync = function(/*ext, stack, fn*/) {
-  this.composer('async').apply(this, arguments);
-};
+Loaders.prototype.buildStack = function(args, cache) {
+  if (!Array.isArray(args)) {
+    throw new TypeError('Loaders#buildStack expects an array.');
+  }
 
-/**
- * Register the given promise loader callback `fn` as `ext`.
- *
- * {%= method("composePromise") %}
- *
- * @param {String|Array} `ext` File extension or name of the loader.
- * @param {Function|Array} `fn` A loader function that returns a promise, or create a loader from other others by passing an array of names.
- * @return {Object} `Loaders` to enable chaining
- * @api public
- */
-
-Loaders.prototype.composePromise = function(/*ext, stack, fn*/) {
-  this.composer('promise').apply(this, arguments);
-};
-
-/**
- * Register the given stream loader callback `fn` as `ext`.
- *
- * {%= method("composeStream") %}
-
- * @param {String|Array} `ext` File extension or name of the loader.
- * @param {Stream|Array} `fn` A stream loader, or create a loader from other others by passing an array of names.
- * @return {Object} `Loaders` to enable chaining
- * @api public
- */
-
-Loaders.prototype.composeStream = function(/*ext, stack, fn*/) {
-  this.composer('stream').apply(this, arguments);
-};
-
-/**
- * Build a stack of loader functions from functions
- * and/or names of other cached loaders.
- *
- * @param  {String} `type` Loader type to get loaders from.
- * @param  {Array}  `stack` Stack of loader functions and names.
- * @return {Array} Array of loader functions
- */
-
-Loaders.prototype.buildStack = function(type, stack) {
-  var len = stack && stack.length, i = 0;
-  var res = [];
+  var len = args.length, i = 0;
+  var stack = [], other = [];
+  cache = cache || this.cache;
 
   while (len--) {
-    var name = stack[i++];
-    if (typeof name === 'string') {
-      res = res.concat(this.cache[type][name]);
-    } else if (Array.isArray(name)) {
-      res.push.apply(res, this.buildStack(type, name));
+    var arg = args[i++];
+    var type = typeOf(arg);
+
+    if (type === 'string' && cache[arg]) {
+      stack.push(cache[arg]);
+    } else if (type === 'function') {
+      stack.push(arg);
+    } else if (type === 'array') {
+      stack.push.apply(stack, this.buildStack(arg, cache).stack);
+    } else if (isStream(arg)) {
+      stack.push(arg);
     } else {
-      res.push(name);
+      other.push(arg);
     }
   }
+
+  var res = {};
+  res.stack = flatten(stack);
+  res.args = other;
   return res;
 };
 
 /**
- * Run loaders associated with `ext` of the given filepath.
+ * Compose a loader function from the given functions and/or
+ * the names of cached loader functions.
  *
- * {%= method("load") %}
- *
- * @param {String} `val` Value to load, like a file path.
- * @param {String} `options` Options to pass to whatever loaders are defined.
- * @return {String}
+ * ```js
+ * // this will return a function from the given loaders
+ * // and function
+ * loaders.compose(['a', 'b', 'c'], function(val) {
+ *   //=> do stuff to val
+ * });
+ * ```
+ * @param {String} `name` The name of the loader stack to compose.
+ * @return {Function} Returns a function to use for loading.
  * @api public
  */
 
-Loaders.prototype.load = function(val, stack, options) {
-  if (!Array.isArray(stack)) {
-    options = stack; stack = [];
-  }
-
-  var loader = matchLoader(val, options, this);
-  stack = this.buildStack('sync', stack);
-  var fns = [];
-  if (this.cache.sync.hasOwnProperty(loader)) {
-    fns = fns.concat(this.cache.sync[loader]);
-  }
-
-  if (stack && stack.length) {
-    fns = fns.concat(stack);
-  }
-
-  if (!fns.length) return val;
-  var len = fns.length, i = 0;
-
-  while (len--) {
-    var fn = fns[i++];
-    val = fn.apply(this, arrayify(val));
-  }
-  return val;
+Loaders.prototype.compose = function() {
+  var fns = this.buildStack([].slice.call(arguments)).stack;
+  return this.iterator.call(this, fns);
 };
 
-/**
- * Run async loaders associated with `ext` of the given filepath.
- *
- * {%= method("loadAsync") %}
-
- * @param {String} `fp` File path to load.
- * @param {Object} `options` Options to pass to whatever loaders are defined.
- * @param {Function} `cb` Callback to indicate loading has finished
- * @return {String}
- * @api public
- */
-
-Loaders.prototype.loadAsync = function(val, stack, options, cb) {
-  var async = requires.async || (requires.async = require('async'));
-  if (typeof stack === 'function') {
-    cb = stack; stack = []; options = {};
-  }
-
-  if (typeof options === 'function') {
-    cb = options; options = {};
-  }
-
-  if (!Array.isArray(stack)) {
-    options = stack; stack = [];
-  }
-
-  stack = this.buildStack('async', stack);
-
-  var loader = matchLoader(val, options, this);
-  var fns = union(this.cache.async[loader] || [], stack);
-  if (!fns.length) {
-    return val;
-  }
-
-  async.reduce(fns, val, function (acc, fn, next) {
-    fn(acc, options, next);
-  }, cb);
-};
-
-/**
- * Run promise loaders associated with `ext` of the given filepath.
- *
- * {%= method("loadAsync") %}
- *
- * @param {String} `fp` File path to load.
- * @param {Object} `options` Options to pass to whatever loaders are defined.
- * @return {Promise} a promise that will be fulfilled later
- * @api public
- */
-
-Loaders.prototype.loadPromise = function(fp, stack, options) {
-  var Promise = requires.promise || (requires.promise = require('bluebird'));
-  if (!Array.isArray(stack)) {
-    options = stack;
-    stack = [];
-  }
-
-  var resolve = Promise.resolve();
-  options = options || {};
-
-  var loader = matchLoader(fp, options, this);
-  stack = this.buildStack('promise', stack);
-
-  var fns = union(this.cache.promise[loader] || [], stack);
-  if (!fns.length) {
-    return resolve.then(function () {
-      return fp;
-    });
-  }
-
-  return Promise.reduce(fns, function (acc, fn) {
-    return fn(acc, options);
-  }, fp);
-};
-
-/**
- * Run stream loaders associated with `ext` of the given filepath.
- *
- * {%= method("loadStream") %}
- *
- * @param {String} `fp` File path to load.
- * @param {Object} `options` Options to pass to whatever loaders are defined.
- * @return {Stream} a stream that will be fulfilled later
- * @api public
- */
-
-Loaders.prototype.loadStream = function(fp, stack, options) {
-  var es = requires.es || (requires.es = require('event-stream'));
-  if (!Array.isArray(stack)) {
-    options = stack;
-    stack = [];
-  }
-
-  options = options || {};
-  var loader = matchLoader(fp, options, this);
-  stack = this.buildStack('stream', stack);
-
-  var fns = union(this.cache.stream[loader] || [], stack);
-  if (!fns.length) {
-    var noop = es.through(function (fp) {
-      this.emit('data', fp);
-    });
-    noop.stream = true;
-    fns = [noop];
-  }
-
-  var stream = es.pipe.apply(es, fns);
-  process.nextTick(function () {
-    stream.write(fp);
-    stream.end();
-  });
-  return stream;
-};
-
-/**
- * Get a loader based on the given pattern.
- *
- * @param {String} `pattern` By default, this is assumed to be a filepath.
- * @return {Object} Object
- */
-
-function matchLoader(pattern, opts, thisArg) {
-  if (opts && opts.matchLoader) {
-    return opts.matchLoader(pattern, opts, thisArg);
-  }
-  return formatExt(path.extname(pattern));
-}
-
-/**
- * Format extensions.
- *
- * @param {String} `ext`
- * @return {String}
- */
-
-function formatExt(ext) {
-  return (ext[0] === '.') ? ext.slice(1) : ext;
-}
-
-/**
- * Concat a list of arrays.
- */
-
-function union() {
-  return [].concat.apply([], arguments);
-}
-
-/**
- * Cast the given value to an array.
- */
-
-function arrayify(val) {
-  return Array.isArray(val) ? val : [val];
-}

@@ -7,18 +7,13 @@
     "name": "Jon Schlinkert",
     "url": "https://github.com/jonschlinkert"
   },
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/jonschlinkert/loader-cache.git"
-  },
+  "repository": "jonschlinkert/loader-cache",
   "bugs": {
     "url": "https://github.com/jonschlinkert/loader-cache/issues"
   },
-  "license": {
-    "type": "MIT",
-    "url": "https://github.com/jonschlinkert/loader-cache/blob/master/LICENSE"
-  },
+  "license": "MIT",
   "files": [
+    "iterators/",
     "index.js"
   ],
   "main": "index.js",
@@ -29,31 +24,29 @@
     "test": "mocha"
   },
   "dependencies": {
-    "async": "^0.9.0",
-    "bluebird": "^2.9.18",
-    "event-stream": "^3.3.0"
+    "arr-flatten": "^1.0.1",
+    "bluebird": "^2.3.11",
+    "event-stream": "^3.1.7",
+    "export-files": "^2.0.1",
+    "is-stream": "^1.0.1",
+    "kind-of": "^0.1.2"
   },
   "devDependencies": {
-    "gulp-istanbul": "^0.7.0",
-    "gulp-jshint": "^1.9.4",
-    "gulp-mocha": "^2.0.0",
-    "gulp-util": "^3.0.4",
+    "extend-shallow": "^1.1.4",
+    "glob": "^5.0.10",
     "js-yaml": "^3.2.3",
-    "jshint-stylish": "^1.0.1",
-    "mocha": "^2.2.1",
-    "should": "^5.0.1",
-    "strip-ansi": "^2.0.1",
-    "verb": "^0.6.2"
+    "mocha": "*",
+    "should": "^5.0.1"
   },
   "keywords": [
+    "content",
+    "ext",
+    "extension",
     "file",
-    "fs",
-    "helper",
     "load",
     "loader",
     "parse",
     "parser",
-    "plugin",
     "read",
     "reader"
   ]

@@ -8,12 +8,14 @@
 'use strict';
 
 /* deps:mocha */
-var fs = require('fs');
 var path = require('path');
+var glob = require('glob');
+var extend = require('extend-shallow');
 var Promise = require('bluebird');
 var es = require('event-stream');
 var YAML = require('js-yaml');
 var Loaders = require('./');
+var fs = require('fs');
 require('should');
 
 var loaders;
@@ -22,206 +24,217 @@ describe('loaders (sync)', function () {
   beforeEach(function() {
     loaders = new Loaders();
 
-    loaders.compose('yaml', function yaml(str) {
+    loaders.register('yaml', function yaml(str) {
       return YAML.safeLoad(str);
     });
 
-    loaders.compose('yml', ['yaml']);
+    loaders.register('yml', ['yaml']);
 
-    loaders.compose('json', function json(fp) {
+    loaders.register('json', function json(fp) {
       return require(path.resolve(fp));
     });
 
-    loaders.compose('read', function read(fp) {
+    loaders.register('read', function read(fp) {
       return fs.readFileSync(fp, 'utf8');
     });
 
-    loaders.compose('hbs', ['read']);
+    loaders.register('hbs', ['read']);
 
-    loaders.compose('data', function data(obj) {
+    loaders.register('data', function data(obj) {
       obj.e = 'f';
       return obj;
     });
   });
 
   it('should register loaders:', function () {
-    loaders.cache.sync.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
+    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
   });
 
-  it('should compose a loader from other loaders with the `.compose()` method:', function () {
-    loaders.compose('foo', ['read', 'yaml']);
-    loaders.cache.sync.should.have.property('foo');
+  it('should register a loader created from other loaders:', function () {
+    loaders.register('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
   });
 
-  it('should compose a loader from other loaders with the `.register()` method:', function () {
-    loaders.compose('foo', ['read', 'yaml']);
-    loaders.cache.sync.should.have.property('foo');
+  it('should register a loader created from other loaders:', function () {
+    loaders.register('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
   });
 
-  it('should compose a loader from other loaders and functions with the `.compose()` method:', function () {
+  it('should register a loader created from other loaders and functions:', function () {
     function bar (fp) { return fp; }
     function baz (contents) { return contents; };
-    loaders.compose('foo', bar, ['read'], baz, ['yaml']);
-    loaders.cache.sync.should.have.property('foo');
-    loaders.cache.sync.foo.length.should.be.eql(4);
+    loaders.register('foo', [bar, 'read', baz, 'yaml']);
+    loaders.cache.should.have.property('foo');
+    loaders.cache.foo.length.should.be.eql(4);
   });
 
-  it('should compose a loader from other loaders and functions with the `.register()` method:', function () {
+  it('should register a loader created from other loaders and functions:', function () {
     function bar (fp) { return fp; }
     function baz (contents) { return contents; };
-    loaders.compose('foo', bar, ['read'], baz, ['yaml']);
-    loaders.cache.sync.should.have.property('foo');
-    loaders.cache.sync.foo.length.should.be.eql(4);
+    loaders.register('foo', [bar, 'read', baz, 'yaml']);
+    loaders.cache.should.have.property('foo');
+    loaders.cache.foo.length.should.be.eql(4);
   });
 
   it('should pass the value returned from a loader to the next loader:', function () {
-    loaders.compose('bar', ['read', 'yaml', 'data']);
-    loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+    loaders.register('bar', ['read', 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 
   it('should pass the value returned from a loader to the next loader:', function () {
     function foo (fp) { return fp; }
     function baz (contents) { return contents; };
-    loaders.compose('bar', foo, ['read'], baz, ['yaml', 'data']);
-    loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+    loaders.register('bar', [foo, 'read', baz, 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 
-  it('should compose a loader from other loaders and the given function:', function () {
-    loaders.compose('foo', ['read', 'yaml'], function foo(val) {
+  it('should expose the loader instance as `this` in loaders:', function () {
+    loaders.register('a', function a(fp) {
+      return fs.readFileSync(fp, 'utf8');
+    });
+    loaders.register('b', function b(fp) {
+      return YAML.load(this.compose('a')(fp));
+    });
+    loaders.register('c', function c(pattern) {
+      return glob.sync(pattern);
+    });
+    loaders.register('d', ['c'], function d(files) {
+      return files.map(this.compose('b'));
+    });
+    loaders.register('e', function e(arr) {
+      return extend.apply(extend, [{}].concat(arr));
+    });
+    loaders.register('parse', ['d', 'e']);
+    loaders.compose(['parse'])('fixtures/*.txt').should.eql({c: 'd', e: 'f'});
+    loaders.compose('parse')('fixtures/*.txt').should.eql({c: 'd', e: 'f'});
+    loaders.compose(['d', 'e'])('fixtures/*.txt').should.eql({c: 'd', e: 'f'});
+  });
+
+  it('should register a loader from other loaders and the given function:', function () {
+    loaders.register('foo', ['read', 'yaml'], function foo(val) {
       return val;
     });
-    loaders.cache.sync.should.have.property('foo');
+    loaders.cache.should.have.property('foo');
   });
 
   it('should pass the value returned from a loader to the next loader:', function () {
-    loaders.compose('bar', ['read', 'yaml', 'data']);
-    loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
+    loaders.register('bar', ['read', 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 
   it('should use loaders passed in at load time:', function () {
-    loaders.compose('bar', ['read', 'yaml']);
-    loaders.load('fixtures/a.bar', ['data']).should.eql({c: 'd', e: 'f'});
+    loaders.register('bar', ['read', 'yaml']);
+    loaders.compose('bar', ['data'])('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 
-  it('should compose a loader from other loaders:', function () {
-    loaders.compose('parse', ['read', 'yaml']);
-    loaders.compose('extend', ['data']);
-    loaders.compose('bar', ['parse', 'extend']);
-    loaders.load('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
-  });
-
-  it('should use a custom function for matching loaders:', function () {
-    loaders.compose('parse', ['read', 'yaml']);
-    loaders.compose('extend', ['data']);
-    loaders.compose('bar', ['parse', 'extend']);
-    loaders.load('fixtures/a.bar', {
-      matchLoader: function(pattern) {
-        return path.extname(pattern).slice(1);
-      }
-    }).should.eql({c: 'd', e: 'f'});
+  it('should register a loader from other loaders:', function () {
+    loaders.register('parse', ['read', 'yaml']);
+    loaders.register('extend', ['data']);
+    loaders.register('bar', ['parse', 'extend']);
+    loaders.compose('bar')('fixtures/a.bar').should.eql({c: 'd', e: 'f'});
   });
 });
 
 describe('loaders async', function () {
   beforeEach(function() {
-    loaders = new Loaders();
+    loaders = new Loaders({type: 'async'});
 
-    loaders.composeAsync('yaml', function yaml(str, options, next) {
+    loaders.register('yaml', function yaml(str, next) {
       next(null, YAML.safeLoad(str));
     });
 
-    loaders.composeAsync('yml', function yml(str, options, next) {
+    loaders.register('yml', function yml(str, next) {
       next(null, YAML.safeLoad(str));
     });
 
-    loaders.composeAsync('json', function json(fp, options, next) {
+    loaders.register('json', function json(fp, next) {
       next(null, require(path.resolve(fp)));
     });
 
-    loaders.composeAsync('read', function read(fp, options, next) {
+    loaders.register('read', function read(fp, next) {
       fs.readFile(fp, 'utf8', next);
     });
 
-    loaders.composeAsync('hbs', function hbs(fp, options, next) {
+    loaders.register('hbs', function hbs(fp, next) {
       fs.readFile(fp, 'utf8', next);
     });
 
-    loaders.composeAsync('data', function data(obj, options, next) {
+    loaders.register('data', function data(obj, next) {
       obj.e = 'f';
       next(null, obj);
     });
   });
 
   it('should register async loaders:', function () {
-    loaders.cache.async.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
+    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
   });
 
-  it('should compose an async loader from other async loaders with the `.compose()` method:', function () {
-    loaders.compose('foo', ['read', 'yaml'], 'async');
-    loaders.cache.async.should.have.property('foo');
+  it('should register an async loader from other async loaders:', function () {
+    loaders.register('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
   });
 
-  it('should compose an async loader from other async loaders with the `.register()` method:', function () {
-    loaders.composeAsync('foo', ['read', 'yaml']);
-    loaders.cache.async.should.have.property('foo');
+  it('should register an async loader from other async loaders:', function () {
+    loaders.register('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
   });
 
-  it('should compose an async loader from other async loaders and functions with the `.compose()` method:', function () {
-    function bar (fp, options, next) { next(null, fp); }
-    function baz (contents, options, next) { next(null, contents); };
-    loaders.compose('foo', bar, ['read'], baz, ['yaml'], 'async');
-    loaders.cache.async.should.have.property('foo');
-    loaders.cache.async.foo.length.should.be.eql(4);
+  it('should register an async loader from other async loaders and functions:', function () {
+    function bar (fp, next) { next(null, fp); }
+    function baz (contents, next) { next(null, contents); };
+    loaders.register('foo', bar, ['read'], baz, ['yaml']);
+    loaders.cache.should.have.property('foo');
+    loaders.cache.foo.length.should.be.eql(4);
   });
 
-  it('should compose an async loader from other async loaders and functions with the `.register()` method:', function () {
-    function bar (fp, options, next) { next(null, fp); }
-    function baz (contents, options, next) { next(null, contents); };
-    loaders.composeAsync('foo', bar, ['read'], baz, ['yaml']);
-    loaders.cache.async.should.have.property('foo');
-    loaders.cache.async.foo.length.should.be.eql(4);
+  it('should register an async loader from other async loaders and functions:', function () {
+    function bar (fp, next) { next(null, fp); }
+    function baz (contents, next) { next(null, contents); };
+    loaders.register('foo', bar, ['read'], baz, ['yaml']);
+    loaders.cache.should.have.property('foo');
+    loaders.cache.foo.length.should.be.eql(4);
   });
 
 
   it('should pass the value returned from an async loader to the next async loader:', function (done) {
-    loaders.composeAsync('bar', ['read', 'yaml', 'data']);
-    loaders.loadAsync('fixtures/a.bar', function (err, obj) {
+    loaders.register('bar', ['read', 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
   });
 
   it('should pass the value returned from an async loader to the next async loader:', function (done) {
-    function foo (fp, options, next) { next(null, fp); }
-    function baz (contents, options, next) { next(null, contents); };
-    loaders.composeAsync('bar', foo, ['read'], baz, ['yaml', 'data']);
-    loaders.loadAsync('fixtures/a.bar', function (err, obj) {
+    function foo (fp, next) { next(null, fp); }
+    function baz (contents, next) { next(null, contents); };
+    loaders.register('bar', foo, ['read'], baz, ['yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
   });
 
   it('should pass the value returned from an async loader to the next async loader:', function (done) {
-    loaders.compose('bar', ['read', 'yaml', 'data'], 'async');
-    loaders.loadAsync('fixtures/a.bar', function (err, obj) {
+    loaders.register('bar', ['read', 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
   });
 
   it('should use async loaders passed in at load time:', function (done) {
-    loaders.compose('bar', ['read', 'yaml'], 'async');
-    loaders.loadAsync('fixtures/a.bar', ['data'], function (err, obj) {
+    loaders.register('bar', ['read', 'yaml']);
+    loaders.compose('bar', ['data'])('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
   });
 
-  it('should compose an async loader from other async loaders:', function (done) {
-    loaders.compose('parse', ['read', 'yaml'], 'async');
-    loaders.compose('extend', ['data'], 'async');
-    loaders.compose('bar', ['parse', 'extend'], 'async');
-    loaders.loadAsync('fixtures/a.bar', function (err, obj) {
+  it('should register an async loader from other async loaders:', function (done) {
+    loaders.register('parse', ['read', 'yaml']);
+    loaders.register('extend', ['data']);
+    loaders.register('bar', ['parse', 'extend']);
+    loaders.compose('bar')('fixtures/a.bar', function (err, obj) {
       obj.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -230,103 +243,103 @@ describe('loaders async', function () {
 
 describe('loaders promise', function () {
   beforeEach(function() {
-    loaders = new Loaders();
+    loaders = new Loaders({type: 'promise'});
 
-    loaders.composePromise('yaml', Promise.method(function yaml(str) {
+    loaders.register('yaml', Promise.method(function yaml(str) {
       return YAML.safeLoad(str);
     }));
 
-    loaders.composePromise('yml', Promise.method(function yml(str) {
+    loaders.register('yml', Promise.method(function yml(str) {
       return YAML.safeLoad(str);
     }));
 
-    loaders.composePromise('json', Promise.method(function json(fp) {
+    loaders.register('json', Promise.method(function json(fp) {
       return require(path.resolve(fp));
     }));
 
-    loaders.composePromise('read', Promise.method(function read(fp) {
+    loaders.register('read', Promise.method(function read(fp) {
       return fs.readFileSync(fp, 'utf8');
     }));
 
-    loaders.composePromise('hbs', Promise.method(function hbs(fp) {
+    loaders.register('hbs', Promise.method(function hbs(fp) {
       return fs.readFileSync(fp, 'utf8');
     }));
 
-    loaders.composePromise('data', Promise.method(function data(obj) {
+    loaders.register('data', Promise.method(function data(obj) {
       obj.e = 'f';
       return obj;
     }));
   });
 
   it('should register promise loaders:', function () {
-    loaders.cache.promise.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
+    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
   });
 
-  it('should compose a promise loader from other promise loaders with the `.compose()` method:', function () {
-    loaders.compose('foo', ['read', 'yaml'], 'promise');
-    loaders.cache.promise.should.have.property('foo');
+  it('should register a promise loader from other promise loaders:', function () {
+    loaders.register('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
   });
 
-  it('should compose a promise loader from other promise loaders with the `.register()` method:', function () {
-    loaders.composePromise('foo', ['read', 'yaml']);
-    loaders.cache.promise.should.have.property('foo');
+  it('should register a promise loader from other promise loaders:', function () {
+    loaders.register('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
   });
 
-  it('should compose a promise loader from other promise loaders and functions with the `.compose()` method:', function () {
+  it('should register a promise loader from other promise loaders and functions:', function () {
     var bar = Promise.method(function bar (fp) { return fp; });
     var baz = Promise.method(function baz (contents) { return contents; });
-    loaders.compose('foo', bar, ['read'], baz, ['yaml'], 'promise');
-    loaders.cache.promise.should.have.property('foo');
-    loaders.cache.promise.foo.length.should.be.eql(4);
+    loaders.register('foo', bar, ['read'], baz, ['yaml']);
+    loaders.cache.should.have.property('foo');
+    loaders.cache.foo.length.should.be.eql(4);
   });
 
-  it('should compose a promise loader from other promise loaders and functions with the `.register()` method:', function () {
+  it('should register a promise loader from other promise loaders and functions:', function () {
     var bar = Promise.method(function bar (fp) { return fp; });
     var baz = Promise.method(function baz (contents) { return contents; });
-    loaders.composePromise('foo', bar, ['read'], baz, ['yaml']);
-    loaders.cache.promise.should.have.property('foo');
-    loaders.cache.promise.foo.length.should.be.eql(4);
+    loaders.register('foo', bar, ['read'], baz, ['yaml']);
+    loaders.cache.should.have.property('foo');
+    loaders.cache.foo.length.should.be.eql(4);
   });
 
-  it('should pass the value returned from a promise loader to the next promise loader:', function (done) {
+  it('should pass the returned value to the next promise loader:', function (done) {
     var foo = Promise.method(function foo (fp) { return fp; });
     var baz = Promise.method(function baz (contents) { return contents; });
-    loaders.composePromise('bar', foo, ['read'], baz, ['yaml', 'data']);
-    loaders.loadPromise('fixtures/a.bar').then(function (results) {
+    loaders.register('bar', foo, ['read'], baz, ['yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
   });
 
-  it('should pass the value returned from a promise loader to the next promise loader:', function (done) {
-    loaders.composePromise('bar', ['read', 'yaml', 'data']);
-    loaders.loadPromise('fixtures/a.bar').then(function (results) {
+  it('should pass the returned value to the next promise loader:', function (done) {
+    loaders.register('bar', ['read', 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
   });
 
-  it('should pass the value returned from a promise loader to the next promise loader:', function (done) {
-    loaders.compose('bar', ['read', 'yaml', 'data'], 'promise');
-    loaders.loadPromise('fixtures/a.bar').then(function (results) {
+  it('should pass the returned value to the next promise loader:', function (done) {
+    loaders.register('bar', ['read', 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
   });
 
   it('should use promise loaders passed in at load time:', function (done) {
-    loaders.compose('bar', ['read', 'yaml'], 'promise');
-    loaders.loadPromise('fixtures/a.bar', ['data']).then(function (results) {
+    loaders.register('bar', ['read', 'yaml']);
+    loaders.compose('bar', ['data'])('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
   });
 
-  it('should compose a promise loader from other promise loaders:', function (done) {
-    loaders.compose('parse', ['read', 'yaml'], 'promise');
-    loaders.compose('extend', ['data'], 'promise');
-    loaders.compose('bar', ['parse', 'extend'], 'promise');
-    loaders.loadPromise('fixtures/a.bar').then(function (results) {
+  it('should register a promise loader from other promise loaders:', function (done) {
+    loaders.register('parse', ['read', 'yaml']);
+    loaders.register('extend', ['data']);
+    loaders.register('bar', ['parse', 'extend']);
+    loaders.compose('bar')('fixtures/a.bar').then(function (results) {
       results.should.eql({c: 'd', e: 'f'});
       done();
     });
@@ -336,85 +349,85 @@ describe('loaders promise', function () {
 
 describe('loaders stream', function () {
   beforeEach(function() {
-    loaders = new Loaders();
+    loaders = new Loaders({type: 'stream'});
 
-    loaders.composeStream('yaml', es.through(function yaml(str) {
+    loaders.register('yaml', es.through(function yaml(str) {
       this.emit('data', YAML.safeLoad(str));
     }));
 
-    loaders.composeStream('yml', es.through(function yml(str) {
+    loaders.register('yml', es.through(function yml(str) {
       this.emit('data', YAML.safeLoad(str));
     }));
 
-    loaders.composeStream('json', es.through(function json(fp) {
+    loaders.register('json', es.through(function json(fp) {
       this.emit('data', require(path.resolve(fp)));
     }));
 
-    loaders.composeStream('read', es.through(function read(fp) {
+    loaders.register('read', es.through(function read(fp) {
       this.emit('data', fs.readFileSync(fp, 'utf8'));
     }));
 
-    loaders.composeStream('hbs', es.through(function hbs(fp) {
+    loaders.register('hbs', es.through(function hbs(fp) {
       this.emit('data', fs.readFileSync(fp, 'utf8'));
     }));
 
-    loaders.composeStream('data', es.through(function data(obj) {
+    loaders.register('data', es.through(function data(obj) {
       obj.e = 'f';
       this.emit('data', obj);
     }));
   });
 
   it('should register stream loaders:', function () {
-    loaders.cache.stream.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
+    loaders.cache.should.have.properties('yaml', 'yml', 'json', 'read', 'hbs', 'data');
   });
 
-  it('should compose a stream loader from other stream loaders with the `.compose()` method:', function () {
-    loaders.compose('foo', ['read', 'yaml'], 'stream');
-    loaders.cache.stream.should.have.property('foo');
+  it('should register a stream loader from other stream loaders:', function () {
+    loaders.register('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
   });
 
-  it('should compose a stream loader from other stream loaders with the `.register()` method:', function () {
-    loaders.composeStream('foo', ['read', 'yaml']);
-    loaders.cache.stream.should.have.property('foo');
+  it('should register a stream loader from other stream loaders:', function () {
+    loaders.register('foo', ['read', 'yaml']);
+    loaders.cache.should.have.property('foo');
   });
 
-  it('should compose a stream loader from other stream loaders and functions with the `.compose()` method:', function () {
+  it('should create a loader from other loaders and functions:', function () {
     var bar = es.through(function bar (fp) { this.emit('data', fp); });
     var baz = es.through(function baz (contents) { this.emit('data', contents); });
-    loaders.compose('foo', bar, ['read'], baz, ['yaml'], 'stream');
-    loaders.cache.stream.should.have.property('foo');
-    loaders.cache.stream.foo.length.should.be.eql(4);
+    loaders.register('foo', bar, ['read'], baz, ['yaml']);
+    loaders.cache.should.have.property('foo');
+    loaders.cache.foo.length.should.be.eql(4);
   });
 
-  it('should compose a stream loader from other stream loaders and functions with the `.register()` method:', function () {
+  it('should create a loader from other loaders and functions:', function () {
     var bar = es.through(function bar (fp) { this.emit('data', fp); });
     var baz = es.through(function baz (contents) { this.emit('data', contents); });
-    loaders.composeStream('foo', bar, ['read'], baz, ['yaml']);
-    loaders.cache.stream.should.have.property('foo');
-    loaders.cache.stream.foo.length.should.be.eql(4);
+    loaders.register('foo', bar, ['read'], baz, ['yaml']);
+    loaders.cache.should.have.property('foo');
+    loaders.cache.foo.length.should.be.eql(4);
   });
 
   it('should pass the value from a stream loader to the next stream loader:', function (done) {
     var foo = es.through(function foo (fp) { this.emit('data', fp); });
     var baz = es.through(function baz (contents) { this.emit('data', contents); });
-    loaders.composeStream('bar', foo, ['read'], baz, ['yaml', 'data']);
-    loaders.loadStream('fixtures/a.bar')
+    loaders.register('bar', foo, ['read'], baz, ['yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar')
       .on('data', function (results) {
         results.should.eql({c: 'd', e: 'f'});
       })
       .on('end', done);
   });
 
-  it('should pass the value from a stream loader to the next stream loader:', function (done) {
-    loaders.composeStream('bar', ['read', 'yaml', 'data']);
-    loaders.loadStream('fixtures/a.bar').on('data', function (results) {
+  it('should pass the value to the next stream loader:', function (done) {
+    loaders.register('bar', ['read', 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar').on('data', function (results) {
       results.should.eql({c: 'd', e: 'f'});
     }).on('end', done);
   });
 
-  it('should pass the value from a stream loader to the next stream loader:', function (done) {
-    loaders.composeStream('bar', ['read', 'yaml', 'data']);
-    loaders.loadStream('fixtures/a.bar')
+  it('should pass the value to the next stream loader:', function (done) {
+    loaders.register('bar', ['read', 'yaml', 'data']);
+    loaders.compose('bar')('fixtures/a.bar')
       .on('data', function (results) {
         results.should.eql({c: 'd', e: 'f'});
       })
@@ -422,19 +435,19 @@ describe('loaders stream', function () {
     });
 
   it('should use stream loaders passed in at load time:', function (done) {
-    loaders.compose('bar', ['read', 'yaml'], 'stream');
-    loaders.loadStream('fixtures/a.bar', ['data'])
+    loaders.register('bar', ['read', 'yaml']);
+    loaders.compose('bar', ['data'])('fixtures/a.bar')
       .on('data', function (results) {
         results.should.eql({c: 'd', e: 'f'});
       })
       .on('end', done);
   });
 
-  it('should compose a stream loader from other stream loaders:', function (done) {
-    loaders.compose('parse', ['read', 'yaml'], 'stream');
-    loaders.compose('extend', ['data'], 'stream');
-    loaders.compose('bar', ['parse', 'extend'], 'stream');
-    loaders.loadStream('fixtures/a.bar').on('data', function (results) {
+  it('should register a stream loader from other stream loaders:', function (done) {
+    loaders.register('parse', ['read', 'yaml']);
+    loaders.register('extend', ['data']);
+    loaders.register('bar', ['parse', 'extend']);
+    loaders.compose('bar')('fixtures/a.bar').on('data', function (results) {
       results.should.eql({c: 'd', e: 'f'});
     }).on('end', done);
   });
