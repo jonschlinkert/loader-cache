@@ -15,128 +15,9 @@ var isStream = require('is-stream');
 var utils = require('./lib/utils');
 
 
-function LoaderStack(options, stack) {
-  if (typeof options === 'function') {
-    stack = options;
-    options = {};
-  }
-  this.options = options || {};
-  this.type = this.options.type || 'sync';
-  this.push(stack);
-}
-
-LoaderStack.prototype.push = function(loaders) {
-  this.stack = this.stack || [];
-  this.stack.push.apply(this.stack, arrayify(loaders));
-  return this;
-};
-
-function Iterator(options, fn) {
-  if (typeof options === 'function') {
-    fn = options;
-    options = {};
-  }
-  this.options = options || {};
-  this.type = this.options.type || 'sync';
-  this.fn = fn;
-}
-
-/**
- * Expose `Loaders`
- */
-
-module.exports = Loaders;
-
-/**
- * requires cache
- */
-
-// var requires = {};
-
-// /**
-//  * Create a new instance of `Loaders`
-//  *
-//  * ```js
-//  * var Loaders = require('loader-cache');
-//  * var loaders = new Loaders();
-//  * ```
-//  *
-//  * @class `Loaders`
-//  * @api public
-//  */
-
-// function Loaders(options) {
-//   if (!(this instanceof Loaders)) {
-//     return new Loaders(options);
-//   }
-//   this.options = options || {};
-//   this.iterators = this.options.iterators || {};
-//   this.types = this.options.types || {};
-//   this.fns = this.options.fns || {};
-// }
-
-// /**
-//  * Add an iterator.
-//  *
-//  * @param {String} `name`
-//  * @param {Function} `fn`
-//  * @api public
-//  */
-
-// Loaders.prototype.iterator = function(type, options, fn) {
-//   this.iterators[type] = new Iterator(options, fn);
-//   return this;
-// };
-
-// /**
-//  * Add an iterator.
-//  *
-//  * @param {String} `name`
-//  * @param {Function} `fn`
-//  * @api public
-//  */
-
-// Loaders.prototype.stack = function(name, loaders) {
-//   if (typeof name === 'string' && arguments.length === 1) {
-//     return this.fns[name].stack;
-//   }
-//   loaders = [].concat.apply([], [].slice.call(arguments, 1));
-//   return this.fns[name].push(loaders);
-// };
-
-// /**
-//  * Add an iterator.
-//  *
-//  * @param {String} `name`
-//  * @param {Function} `fn`
-//  * @api public
-//  */
-
-// Loaders.prototype.loader = function(name, options, stack) {
-//   this.fns[name] = new LoaderStack(options, stack);
-//   return this;
-// };
-
-
-// var loaders = new Loaders();
-
-// loaders.iterator('a', function () {});
-// loaders.iterator('b', {foo: 'bar'}, function () {});
-
-// loaders.loader('d', {e: 'f'}, function a() {});
-// loaders.loader('c', function a() {});
-// loaders.stack('c', function b() {
-// }, function c() {
-// }, function d() {
-// }, function e() {
-// })
-
-// console.log(loaders.stack('c'))
-
-
-function Loaders(options) {
-  if (!(this instanceof Loaders)) {
-    return new Loaders(options);
+function LoaderCache(options) {
+  if (!(this instanceof LoaderCache)) {
+    return new LoaderCache(options);
   }
   this.options = options || {};
   this.iterators = this.options.iterators || {};
@@ -153,12 +34,12 @@ function Loaders(options) {
  * @api public
  */
 
-Loaders.prototype.iterator = function(type, fn) {
+LoaderCache.prototype.iterator = function(type, fn) {
   if (typeof type !== 'string') {
-    throw new TypeError('Loaders#iterator type should be a string.');
+    throw new TypeError('LoaderCache#iterator type should be a string.');
   }
   if (typeof fn !== 'function') {
-    throw new TypeError('Loaders#iterator fn should be a function.');
+    throw new TypeError('LoaderCache#iterator fn should be a function.');
   }
   this.iterators[type] = fn;
   return this;
@@ -171,7 +52,7 @@ Loaders.prototype.iterator = function(type, fn) {
  * @api public
  */
 
-Loaders.prototype.loaderType = function(type) {
+LoaderCache.prototype.loaderType = function(type) {
   if (this.loaders.hasOwnProperty(type)) return;
   this.loaders[type] = {};
   return this;
@@ -184,7 +65,7 @@ Loaders.prototype.loaderType = function(type) {
  * @api public
  */
 
-Loaders.prototype.resolveLoader = function(type) {
+LoaderCache.prototype.resolveLoader = function(type) {
   var stack = this.loaders[type];
   return function (val) {
     return stack[val] || val;
@@ -200,13 +81,12 @@ Loaders.prototype.resolveLoader = function(type) {
  * @api public
  */
 
-Loaders.prototype.loader = function(name, options, stack) {
+LoaderCache.prototype.loader = function(name, options, stack) {
   stack = flatten([].slice.call(arguments, 1));
-  var opts = isObject(options) ? stack.shift() : {};
+  var opts = utils.isOptions(options) ? stack.shift() : {};
   var type = opts.loaderType || 'sync';
   this.loaders[type] = this.loaders[type] || {};
   this.loaders[type][name] = this.loaders[type][name] || [];
-
   if (!this.loaders[type][name]) {
     this.loaders[type][name] = utils.arrayify(stack);
   } else {
@@ -225,16 +105,18 @@ Loaders.prototype.loader = function(name, options, stack) {
  * @return {Array}
  */
 
-Loaders.prototype.buildStack = function(opts, stack) {
+LoaderCache.prototype.buildStack = function(opts, stack) {
   stack = utils.union(stack);
-  if (!stack || stack.length === 0) return [];
 
+  if (!stack || stack.length === 0) return [];
   var type = this.loaders[opts.loaderType || 'sync'] || {};
 
   return stack.reduce(function (acc, loader) {
     if (typeof loader === 'string') {
       acc.push(type[loader]);
     } else if (typeof loader === 'function') {
+      acc.push(loader);
+    } else if (utils.isStream(loader) || utils.isPromise(loader)) {
       acc.push(loader);
     } else if (Array.isArray(loader)) {
       acc = acc.concat(loader);
@@ -250,12 +132,13 @@ Loaders.prototype.buildStack = function(opts, stack) {
  * @return {Array}
  */
 
-Loaders.prototype.getLoaders = function(arr) {
+LoaderCache.prototype.getLoaderCache = function(arr) {
   var len = arr.length;
   var stack = [];
   if (len === 0) {
     return [];
   }
+
   while (len--) {
     var val = arr[len];
     if (!utils.isLoader(val) || len === 0) break;
@@ -265,18 +148,29 @@ Loaders.prototype.getLoaders = function(arr) {
 };
 
 /**
- * Register a loader.
- *
- * @param  {String} `name`
- * @param  {String} `options` If `loaderType` is not passed, defaults to `sync`
- * @param  {Array|Function} `stack` Array or list of loader functions or names.
- * @api public
+ * Get the `firstLoader` to use
  */
 
-Loaders.prototype.firstLoader = function(type, name) {
+LoaderCache.prototype.firstLoader = function(type, name) {
   if (arguments.length === 1 && typeof type === 'string') {
-    return this.loaders[type][name || 'default'];
+    return this.loaders[type][name || 'default'] || [];
   }
+};
+
+/**
+ * Get the `loaderType` to use. If a type isn't defined, but
+ * only one kind of iterator is registered, then we assume
+ * that's the type to use.
+ */
+
+LoaderCache.prototype.getType = function(opts) {
+  opts = opts || {};
+  var keys = Object.keys(this.iterators);
+  var type = opts.loaderType;
+  if (!type && keys.length === 1) {
+    type = keys[0];
+  }
+  return type || 'sync';
 };
 
 /**
@@ -287,15 +181,25 @@ Loaders.prototype.firstLoader = function(type, name) {
  * @return {Function}
  */
 
-Loaders.prototype.compose = function(opts, stack) {
-  var iterator = this.iterators[opts.loaderType];
-  var type = opts.loaderType || 'sync';
+LoaderCache.prototype.compose = function(opts, stack) {
+  if (!isObject(opts)) {
+    stack = opts;
+    opts = {};
+  }
+
+  var type = this.getType(opts);
+  var iterator = this.iterators[type];
+  stack = utils.arrayify(stack);
+
+  var ctx = {app: this, options: opts, loaders: this.loaders[type]};
   var isAsync = type === 'async';
+  var self = this;
 
   return function (key, value, locals, options) {
-    var args = [].slice.call(arguments);
-    var loaders = this.getLoaders(args);
-    // get the length before modifying stack
+    var args = [].slice.call(arguments).filter(Boolean);
+    var loaders = self.getLoaderCache(args);
+
+    // get the length before modifying the loader stack
     var len = loaders.length;
 
     // if loading is async, get the done function
@@ -304,14 +208,13 @@ Loaders.prototype.compose = function(opts, stack) {
     // combine the `create` and collection stacks
     stack = utils.union(stack, loaders);
     if (stack.length === 0) {
-      stack = this.firstLoader(type) || [];
+      stack = self.firstLoader(type);
     }
 
     // ensure that all loaders are functions
-    stack = this.buildStack(opts, stack);
+    stack = self.buildStack(opts, stack);
     // last loader, for adding views to the collection
     stack = stack.concat(opts.lastLoader || []);
-
     // chop of non-args to get the actual args
     args = args.slice(0, args.length - len);
     // if async, re-add the done function to the args
@@ -320,7 +223,13 @@ Loaders.prototype.compose = function(opts, stack) {
     }
 
     // create the actual `load` function
-    var load = iterator.call(this, stack);
-    return load.apply(this, args);
-  }.bind(this);
+    var load = iterator.call(self, stack);
+    return load.apply(ctx, args);
+  };
 };
+
+/**
+ * Expose `LoaderCache`
+ */
+
+module.exports = LoaderCache;
