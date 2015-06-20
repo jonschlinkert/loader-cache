@@ -17,6 +17,96 @@ var flatten = require('arr-flatten');
 var isStream = require('is-stream');
 var utils = require('./lib/utils');
 
+
+// function LoaderStack(options) {
+//   this.options = options || {};
+//   this.stack = [];
+// }
+
+// LoaderStack.prototype.push = function(loaders) {
+//   this.stack.push.apply(this.stack, union(loaders));
+// };
+
+// function Iterator(options, fn) {
+//   if (typeof options === 'function') {
+//     fn = options;
+//     options = {};
+//   }
+//   this.options = options || {};
+//   this.type = this.options.type || 'sync';
+//   this.fn = fn;
+// }
+
+// function Loaders(options) {
+//   if (!(this instanceof Loaders)) {
+//     return new Loaders(options);
+//   }
+//   this.options = options || {};
+//   this.iterators = this.options.iterators || {};
+//   this.types = this.options.types || {};
+//   this.fns = this.options.fns || {};
+// }
+
+// /**
+//  * Add an iterator.
+//  *
+//  * @param {String} `name`
+//  * @param {Function} `fn`
+//  * @api public
+//  */
+
+// Loaders.prototype.iterator = function(type, options, fn) {
+//   this.iterators[type] = new Iterator(options, fn);
+//   return this;
+// };
+
+// *
+//  * Get a loader stack with the given `name` and `options`.
+//  *
+//  * @param {String} `name`
+//  * @param {Object} `options`
+//  * @api public
+
+
+// Loaders.prototype.stack = function(name, opts) {
+//   return this.fns[name] = (this.fns[name] || new LoaderStack(opts));
+// };
+
+// /**
+//  * Register a loader.
+//  *
+//  * @param {String} `name`
+//  * @param {Function} `fn`
+//  * @api public
+//  */
+
+// Loaders.prototype.loader = function(name, stack, opts) {
+//   return this.stack(name, opts).push(stack);
+// };
+
+
+// var loaders = new Loaders();
+
+// loaders.iterator('sync', require('iterator-sync'));
+// loaders.iterator('async', require('iterator-async'));
+
+// loaders.loader('d', {e: 'f'}, function a() {});
+
+// loaders.loader('c', function a() {});
+// loaders.loader('c', function a() {});
+// loaders.loader('c', function a() {});
+// loaders.loader('c', function a() {});
+// loaders.loader('c', function a() {});
+// loaders.loader('c', function a() {});
+// loaders.stack('c', function b() {
+//   }, function c() {
+//   }, function d() {
+//   }, function e() {
+// })
+
+// console.log(loaders.stack('c'))
+
+
 /**
  * Create a new instance of `LoaderCache`
  *

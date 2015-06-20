@@ -13,7 +13,7 @@
   },
   "license": "MIT",
   "files": [
-    "iterators/",
+    "lib/",
     "index.js"
   ],
   "main": "index.js",
