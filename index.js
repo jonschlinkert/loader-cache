@@ -8,12 +8,24 @@
 'use strict';
 
 var path = require('path');
+var arrayifyCompact = require('arrayify-compact');
+var union = require('arr-union');
+var slice = require('array-slice');
 var typeOf = require('kind-of');
 var isObject = require('isobject');
 var flatten = require('arr-flatten');
 var isStream = require('is-stream');
 var utils = require('./lib/utils');
 
+/**
+ * Create a new instance of `LoaderCache`
+ *
+ * ```js
+ * var LoaderCache = require('loader-cache');
+ * var loaderCache = new LoaderCache();
+ * ```
+ * @api public
+ */
 
 function LoaderCache(options) {
   if (!(this instanceof LoaderCache)) {
@@ -163,7 +175,7 @@ LoaderCache.prototype.firstLoader = function(type, name) {
  * that's the type to use.
  */
 
-LoaderCache.prototype.getType = function(opts) {
+LoaderCache.prototype.detectLoaderType = function(opts) {
   opts = opts || {};
   var keys = Object.keys(this.iterators);
   var type = opts.loaderType;
@@ -187,7 +199,7 @@ LoaderCache.prototype.compose = function(opts, stack) {
     opts = {};
   }
 
-  var type = this.getType(opts);
+  var type = this.detectLoaderType(opts);
   var iterator = this.iterators[type];
   stack = utils.arrayify(stack);
 
