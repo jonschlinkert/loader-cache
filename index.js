@@ -1,7 +1,7 @@
 'use strict';
 
 var extend = require('extend-shallow');
-var LoaderType = require('./loader-type');
+var LoaderType = require('./lib/type');
 var utils = require('./lib/utils');
 
 /**
@@ -20,6 +20,8 @@ function LoaderCache(options) {
   }
   this.options = options || {};
   this.defaultType = this.options.defaultType || 'sync';
+  this.iterators = {};
+  this.loaders = {};
   this.types = [];
 }
 
@@ -30,7 +32,13 @@ LoaderCache.prototype = {
     if (arguments.length === 1) {
       return this[type].iterator.fn;
     }
-    this[type] = new LoaderType(options, fn);
+    if (typeof options === 'function') {
+      fn = options;
+      options = {};
+    }
+    this[type] = new LoaderType(options, fn.bind(this));
+    this.iterators[type] = this[type].iterator.fn;
+    this.loaders[type] = this[type].loaders || {};
     this.setLoaderType(type);
   },
 
@@ -83,16 +91,19 @@ LoaderCache.prototype = {
     return stack;
   },
 
-  compose: function(/*options, loaders*/) {
+  compose: function(name/*options, loaders*/) {
     var args = utils.slice(arguments);
     var opts = args.shift();
 
     var type = this.getLoaderType(opts);
     var inst = this[type];
-    var last = inst.loaders.last;
-
-    var stack = inst.resolve(args);
+    var last = inst.loaders.last || [];
     var load = this.iterator(type);
+    var stack = inst.resolve(args);
+
+    var ctx = { app: this };
+    ctx.options = opts;
+    ctx.loaders = this.loaders[type];
 
     return function (/*key, value, locals, options*/) {
       args = [].slice.call(arguments);
@@ -100,8 +111,9 @@ LoaderCache.prototype = {
       stack = inst.resolve(stack, fns, last);
 
       args = args.slice(0, args.length - fns.length);
-      var fn = load.call(this, stack);
-      return fn.apply(this, args);
+      var fn = load(stack);
+
+      return fn.apply(ctx, args);
     }.bind(this);
   }
 };
