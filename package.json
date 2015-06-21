@@ -25,16 +25,10 @@
   },
   "dependencies": {
     "arr-flatten": "^1.0.1",
-    "arr-union": "^2.1.0",
-    "array-slice": "^0.2.3",
-    "array-union": "^1.0.1",
-    "arrayify-compact": "^0.2.0",
     "bluebird": "^2.9.27",
     "event-stream": "^3.3.1",
     "get-value": "^1.1.5",
-    "is-stream": "^1.0.1",
     "isobject": "^1.0.0",
-    "kind-of": "^2.0.0",
     "lazy-cache": "^0.1.0",
     "set-value": "^0.2.0"
   },
