@@ -20,8 +20,6 @@ function LoaderCache(options) {
   }
   this.options = options || {};
   this.defaultType = this.options.defaultType || 'sync';
-  this.iterators = {};
-  this.loaders = {};
   this.types = [];
 }
 
@@ -37,8 +35,6 @@ LoaderCache.prototype = {
       options = {};
     }
     this[type] = new LoaderType(options, fn.bind(this));
-    this.iterators[type] = this[type].iterator.fn;
-    this.loaders[type] = this[type].loaders || {};
     this.setLoaderType(type);
   },
 
@@ -103,7 +99,7 @@ LoaderCache.prototype = {
 
     var ctx = { app: this };
     ctx.options = opts;
-    ctx.loaders = this.loaders[type];
+    ctx.loaders = this[type].loaders;
 
     return function (/*key, value, locals, options*/) {
       args = [].slice.call(arguments);
