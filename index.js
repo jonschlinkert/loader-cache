@@ -203,10 +203,17 @@ LoaderCache.prototype.compose = function(opts, stack) {
 
   return function (key, value, locals, options) {
     var args = [].slice.call(arguments).filter(Boolean);
-    var loaders = self.getLoaderCache(args);
+    var loaders = [];
+    var len = args.length;
 
-    // get the length before modifying the loader stack
-    var len = loaders.length;
+    while (len-- > 1) {
+      var arg = args[len];
+      if (utils.isLoader(arg)) {
+        loaders.unshift(args.pop());
+      } else {
+        break;
+      }
+    }
 
     // if loading is async, get the done function
     var cb = isAsync ? loaders.pop() : null;
@@ -221,8 +228,8 @@ LoaderCache.prototype.compose = function(opts, stack) {
     stack = self.buildStack(opts, stack);
     // last loader, for adding views to the collection
     stack = stack.concat(opts.lastLoader || []);
-    // chop of non-args to get the actual args
-    args = args.slice(0, args.length - len);
+    delete opts.lastLoader;
+
     // if async, re-add the done function to the args
     if (isAsync) {
       args = args.concat(cb);
