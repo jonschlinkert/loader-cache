@@ -1,6 +1,9 @@
 'use strict';
 
+var Emitter = require('component-emitter');
 var extend = require('extend-shallow');
+var get = require('get-value');
+var set = require('set-value');
 var LoaderType = require('./lib/type');
 var utils = require('./lib/utils');
 
@@ -18,13 +21,76 @@ function LoaderCache(options) {
   if (!(this instanceof LoaderCache)) {
     return new LoaderCache(options);
   }
+  Emitter.call(this);
   this.options = options || {};
   this.defaultType = this.options.defaultType || 'sync';
   this.types = [];
+  this.decorate('first');
+  this.decorate('last');
+  this.decorate('resolve');
+  this.decorate('get');
 }
 
-LoaderCache.prototype = {
+/**
+ * LoaderStack prototype methods.
+ */
+
+LoaderCache.prototype = Emitter({
   contructor: LoaderCache,
+
+  /**
+   * Set an option.
+   *
+   * @param  {String|Object} `prop` Option key or object.
+   * @param  {*} `value`
+   * @api public
+   */
+
+  option: function(prop, value) {
+    var len = arguments.length;
+    var type = typeof prop;
+
+    if (type === 'string' && len === 1) {
+      return get(this.options, prop);
+    } else if (type === 'object') {
+      utils.visit(this, 'option', prop);
+      return this;
+    }
+
+    set(this.options, prop, value);
+    this.emit('option', prop, value);
+    return this;
+  },
+
+  /**
+   * Decorate the given method onto the LoaderCache instance.
+   *
+   * @param  {String} `method` Method name to decorate
+   * @param  {String} `alias` Optionally specify an alias to use
+   * @return {String}
+   */
+
+  decorate: function(method, alias) {
+    utils.defineProp(this, method, function(name, opts, stack) {
+      var args = utils.slice(arguments);
+      var opts = args.shift();
+      var type = this.getLoaderType(opts);
+      var inst = this[type];
+      return inst[alias || method].apply(inst, arguments);
+    });
+  },
+
+  /**
+   * Register an iterator function of the given `type`. Types typically
+   * represent a kind of flow-control, like `sync`, `promise`, `stream`,
+   * `async` etc.
+   *
+   * @param  {String} `type`
+   * @param  {Object} `options`
+   * @param  {Function} `fn` The actual iterator function.
+   * @return {Object}
+   * @api public
+   */
 
   iterator: function(type, options, fn) {
     if (arguments.length === 1) {
@@ -36,6 +102,30 @@ LoaderCache.prototype = {
     }
     this[type] = new LoaderType(options, fn.bind(this));
     this.setLoaderType(type);
+    return this;
+  },
+
+  /**
+   * Set a loader.
+   *
+   * @param  {String} `name`
+   * @param  {Object} `options`
+   * @param  {Function|Array} `fns` One or more loader functions or names of other registered loaders.
+   * @return {Array}
+   */
+
+  set: function(name/*, options, fns*/) {
+    var args = utils.slice(arguments, 1);
+    var opts = args.shift();
+    var type = this.getLoaderType(opts);
+    this[type].set(name, this[type].resolve(args));
+    return this;
+  },
+
+  seq: function (type, stack) {
+    var args = this.resolve([].slice.call(arguments, 1));
+    var iterator = this[type].iterator.fn;
+    return iterator(args);
   },
 
   setLoaderType: function(type) {
@@ -46,73 +136,65 @@ LoaderCache.prototype = {
 
   getLoaderType: function(options) {
     var opts = extend({loaderType: this.defaultType}, options);
-    var type = opts.loaderType;
+    var type = opts.loaderType || 'sync';
     if (!this[type]) {
       throw new Error('LoaderCache: invalid loader type: ' + type);
     }
     return type;
   },
 
-  loader: function(name/*, options, fns*/) {
+  compose: function(name, options, stack) {
     var args = utils.slice(arguments, 1);
     var opts = args.shift();
-    var type = this.getLoaderType(opts);
-    this[type].set(name, this[type].resolve(args));
-    return this[type];
-  },
-
-  get: function(name, options) {
-    var type = this.getLoaderType(options);
-    return this[type].resolve(name);
-  },
-
-  /**
-   * Get the loaders from the end of an array.
-   *
-   * @param  {Array} `arr`
-   * @return {Array}
-   */
-
-  getLoaders: function(arr) {
-    var len = arr.length;
-    var stack = [];
-    if (len === 0) {
-      return [];
-    }
-    while (len--) {
-      var val = arr[len];
-      if (!utils.isLoader(val) || len === 0) break;
-      stack.unshift(val);
-    }
-    return stack;
-  },
-
-  compose: function(name/*options, loaders*/) {
-    var args = utils.slice(arguments);
-    var opts = args.shift();
 
     var type = this.getLoaderType(opts);
+    opts.loaderType = type;
+
     var inst = this[type];
-    var last = inst.loaders.last || [];
-    var load = this.iterator(type);
-    var stack = inst.resolve(args);
+    var iterator = this.iterator(type);
 
+    stack = this.resolve(this.get(name).concat(args));
     var ctx = { app: this };
     ctx.options = opts;
-    ctx.loaders = this[type].loaders;
+    ctx.iterator = inst.iterator;
+    ctx.loaders = inst;
 
-    return function (/*key, value, locals, options*/) {
-      args = [].slice.call(arguments);
-      var fns = this.getLoaders(args);
-      stack = inst.resolve(stack, fns, last);
+    return function () {
+      var args = [].slice.call(arguments).filter(Boolean);
+      var len = args.length, loaders = [], cb = null;
 
-      args = args.slice(0, args.length - fns.length);
-      var fn = load(stack);
+      while (len-- > 1) {
+        var arg = args[len];
+        if (!utils.isLoader(arg)) break;
+        loaders.unshift(args.pop());
+      }
 
-      return fn.apply(ctx, args);
+      // combine the `create` and collection stacks
+      stack = stack.concat(this.resolve(loaders));
+
+      // if loading is async, move the done function to args
+      if (type === 'async') {
+        args = args.concat(stack.pop());
+      }
+
+      // add first and last loaders
+      var first = this.first(name);
+      this.emit('first', args, first);
+      stack.unshift(first);
+
+      var last = this.last(name);
+      this.emit('last', args, last);
+      stack.push(last);
+
+      stack = this.resolve(stack);
+      this.emit('load', args, stack);
+
+      // create the actual `load` function
+      var load = iterator.call(this, stack);
+      return load.apply(ctx, args);
     }.bind(this);
   }
-};
+});
 
 /**
  * Expose `LoaderCache`
