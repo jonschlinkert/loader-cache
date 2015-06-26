@@ -159,12 +159,13 @@ LoaderCache.prototype = Emitter({
     if (!utils.isLoader(options)) {
       opts = args.shift();
     }
+
     var type = this.getLoaderType(opts);
-    var wrap = opts.wrap || utils.noop;
     opts.loaderType = type;
 
     var inst = this[type];
     var iterator = this.iterator(type);
+
     stack = inst.resolve(inst.get(name).concat(args));
 
     var ctx = { app: this };
@@ -183,17 +184,17 @@ LoaderCache.prototype = Emitter({
       }
 
       // combine the `create` and collection stacks
-      stack = stack.concat(inst.resolve(loaders));
+      loaders = stack.concat(inst.resolve(loaders));
 
       // if loading is async, move the done function to args
       if (type === 'async') {
-        args = args.concat(stack.pop());
+        args = args.concat(loaders.pop());
       }
-      stack = inst.resolve(stack);
-      stack = stack.map(wrap);
+      loaders = inst.resolve(loaders);
+      var wrapped = loaders.map(opts.wrap || utils.noop);
 
       // create the actual `load` function
-      var load = iterator.call(this, stack);
+      var load = iterator.call(this, wrapped);
       return load.apply(ctx, args);
     }.bind(this);
   }
