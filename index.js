@@ -165,9 +165,6 @@ LoaderCache.prototype = Emitter({
 
     var inst = this[type];
     var iterator = this.iterator(type);
-
-    console.log(inst.resolve)
-
     stack = inst.resolve(inst.get(name).concat(args));
 
     var ctx = { app: this };
