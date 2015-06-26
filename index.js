@@ -190,7 +190,11 @@ LoaderCache.prototype = Emitter({
       if (type === 'async') {
         args = args.concat(loaders.pop());
       }
+
       loaders = inst.resolve(loaders);
+      if (loaders.length === 0) {
+        loaders = inst.resolve(opts.defaultLoader || [])
+      }
       var wrapped = loaders.map(opts.wrap || utils.noop);
 
       // create the actual `load` function
