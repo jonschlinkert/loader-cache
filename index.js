@@ -25,8 +25,6 @@ function LoaderCache(options) {
   this.options = options || {};
   this.defaultType = this.options.defaultType || 'sync';
   this.types = [];
-  this.decorate('first');
-  this.decorate('last');
   this.decorate('resolve');
   this.decorate('get');
 }
@@ -37,6 +35,16 @@ function LoaderCache(options) {
 
 LoaderCache.prototype = Emitter({
   contructor: LoaderCache,
+
+  // get: function (type, name) {
+  //   return this[type].get(name);
+  // },
+
+  // resolve: function (type, stack) {
+  //   var args = [].slice.call(arguments, 1);
+  //   var fn = this[type].resolve;
+  //   return fn.apply(this[type], args);
+  // },
 
   /**
    * Set an option.
@@ -71,7 +79,7 @@ LoaderCache.prototype = Emitter({
    */
 
   decorate: function(method, alias) {
-    utils.defineProp(this, method, function(name, opts, stack) {
+    utils.defineProp(this, method, function() {
       var args = utils.slice(arguments);
       var opts = args.shift();
       var type = this.getLoaderType(opts);
@@ -114,7 +122,7 @@ LoaderCache.prototype = Emitter({
    * @return {Array}
    */
 
-  set: function(name/*, options, fns*/) {
+  loader: function(name/*, options, fns*/) {
     var args = utils.slice(arguments, 1);
     var opts = args.shift();
     var type = this.getLoaderType(opts);
@@ -144,8 +152,13 @@ LoaderCache.prototype = Emitter({
   },
 
   compose: function(name, options, stack) {
-    var args = utils.slice(arguments, 1);
-    var opts = args.shift();
+    var args = utils.slice(arguments);
+    var opts = {};
+    name = args.shift();
+
+    if (!utils.isLoader(options)) {
+      opts = args.shift();
+    }
 
     var type = this.getLoaderType(opts);
     opts.loaderType = type;
@@ -153,7 +166,10 @@ LoaderCache.prototype = Emitter({
     var inst = this[type];
     var iterator = this.iterator(type);
 
-    stack = this.resolve(this.get(name).concat(args));
+    console.log(inst.resolve)
+
+    stack = inst.resolve(inst.get(name).concat(args));
+
     var ctx = { app: this };
     ctx.options = opts;
     ctx.iterator = inst.iterator;
@@ -170,24 +186,14 @@ LoaderCache.prototype = Emitter({
       }
 
       // combine the `create` and collection stacks
-      stack = stack.concat(this.resolve(loaders));
+      stack = stack.concat(inst.resolve(loaders));
 
       // if loading is async, move the done function to args
       if (type === 'async') {
         args = args.concat(stack.pop());
       }
-
-      // add first and last loaders
-      var first = this.first(name);
-      this.emit('first', args, first);
-      stack.unshift(first);
-
-      var last = this.last(name);
-      this.emit('last', args, last);
-      stack.push(last);
-
-      stack = this.resolve(stack);
-      this.emit('load', args, stack);
+      stack = inst.resolve(stack);
+      stack = stack.map(opts.wrap || utils.noop);
 
       // create the actual `load` function
       var load = iterator.call(this, stack);
