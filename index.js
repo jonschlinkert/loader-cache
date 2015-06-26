@@ -159,8 +159,8 @@ LoaderCache.prototype = Emitter({
     if (!utils.isLoader(options)) {
       opts = args.shift();
     }
-
     var type = this.getLoaderType(opts);
+    var wrap = opts.wrap || utils.noop;
     opts.loaderType = type;
 
     var inst = this[type];
@@ -190,7 +190,7 @@ LoaderCache.prototype = Emitter({
         args = args.concat(stack.pop());
       }
       stack = inst.resolve(stack);
-      stack = stack.map(opts.wrap || utils.noop);
+      stack = stack.map(wrap);
 
       // create the actual `load` function
       var load = iterator.call(this, stack);
