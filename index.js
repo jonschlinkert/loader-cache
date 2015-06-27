@@ -195,7 +195,7 @@ LoaderCache.prototype = Emitter({
       if (loaders.length === 0) {
         loaders = inst.resolve(opts.defaultLoader || [])
       }
-      var wrapped = loaders.map(opts.wrap || utils.noop);
+      var wrapped = loaders.map(opts.wrap || utils.identity);
 
       // create the actual `load` function
       var load = iterator.call(this, wrapped);
