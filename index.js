@@ -58,6 +58,16 @@ LoaderCache.prototype = {
    * represent a kind of flow-control, like `sync`, `promise`, `stream`,
    * `async` etc.
    *
+   * ```js
+   * loader.iterator('sync', function(stack) {
+   *   // `stack` is the loader stack (array) to iterate over
+   *   // each item in array is a loader function
+   *   return function(args) {
+   *     // `args` is the arguments passed to the loaders
+   *   }
+   * });
+   * ```
+   * @name .iterator
    * @param  {String} `type`
    * @param  {Object} `options`
    * @param  {Function} `fn` The actual iterator function.
@@ -94,6 +104,7 @@ LoaderCache.prototype = {
    * });
    * ```
    *
+   * @name .loader
    * @param  {String} `name`
    * @param  {Object} `options`
    * @param  {Function|Array} `fns` One or more loader functions or names of other registered loaders.
@@ -139,6 +150,7 @@ LoaderCache.prototype = {
    * var files = fn('*.txt');
    * ```
    *
+   * @name .compose
    * @param  {String} `name` The name of the loader stack to use.
    * @param  {Object} `options`
    * @param  {Array|Function} `stack` Additional loader names or functions.
