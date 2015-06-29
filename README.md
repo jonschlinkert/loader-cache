@@ -52,9 +52,9 @@ var LoaderCache = require('loader-cache');
 var loaders = new LoaderCache();
 ```
 
-Register an iterator function of the given `type`. Types typically
-represent a kind of flow-control, like `sync`, `promise`, `stream`,
-`async` etc.
+### [.iterator](index.js#L78)
+
+Register an iterator function of the given `type`. Types typically represent a kind of flow-control, like `sync`, `promise`, `stream`, `async` etc.
 
 **Params**
 
@@ -62,6 +62,22 @@ represent a kind of flow-control, like `sync`, `promise`, `stream`,
 * `options` **{Object}**
 * `fn` **{Function}**: The actual iterator function.
 * `returns` **{Object}**
+
+**Example**
+
+```js
+loader.iterator('sync', function(stack) {
+  // `stack` is the loader stack (array) to iterate over
+  // each item in array is a loader function
+  return function(args) {
+    // `args` is the arguments passed to the loaders
+  }
+});
+```
+
+### [.loader](index.js#L115)
+
+Register a loader. The first argument is the name of the loader to register.
 
 **Params**
 
@@ -84,6 +100,10 @@ loaders.loader('foo', ['bar', 'baz'], function(patterns, options) {
   return glob.sync(patterns, options);
 });
 ```
+
+### [.compose](index.js#L161)
+
+Compose the actual `load` function from a loader stack.
 
 **Params**
 
