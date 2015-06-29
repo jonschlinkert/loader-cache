@@ -83,13 +83,13 @@ LoaderCache.prototype = {
    *
    * ```js
    * // create a loader from other loaders.
-   * app.loader('foo', ['bar', 'baz']);
+   * loaders.loader('foo', ['bar', 'baz']);
    * // pass a function
-   * app.loader('foo', function(patterns, options) {
+   * loaders.loader('foo', function(patterns, options) {
    *   return glob.sync(patterns, options);
    * });
    * // combination
-   * app.loader('foo', ['bar', 'baz'], function(patterns, options) {
+   * loaders.loader('foo', ['bar', 'baz'], function(patterns, options) {
    *   return glob.sync(patterns, options);
    * });
    * ```
@@ -134,7 +134,7 @@ LoaderCache.prototype = {
    * Compose the actual `load` function from a loader stack.
    *
    * ```js
-   * var fn = app.compose('foo');
+   * var fn = loaders.compose('foo');
    * // load some files
    * var files = fn('*.txt');
    * ```
