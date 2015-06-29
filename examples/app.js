@@ -22,9 +22,6 @@ App.prototype.create = function(name, opts, loaders) {
 var app = new App({defaultType: 'sync'});
 var opts = {loaderType: 'sync'};
 
-app.iterator('async', function (stack) {
-});
-
 app.iterator('sync', function (stack) {
   return function (arg) {
     var len = stack.length, i = -1;

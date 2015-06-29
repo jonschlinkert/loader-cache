@@ -1,6 +1,6 @@
 'use strict';
 
-var Emitter = require('component-emitter');
+var isObject = require('is-extendable');
 var extend = require('extend-shallow');
 var get = require('get-value');
 var set = require('set-value');
@@ -21,7 +21,6 @@ function LoaderCache(options) {
   if (!(this instanceof LoaderCache)) {
     return new LoaderCache(options);
   }
-  Emitter.call(this);
   this.options = options || {};
   this.defaultType = this.options.defaultType || 'sync';
   this.types = [];
@@ -33,42 +32,8 @@ function LoaderCache(options) {
  * LoaderStack prototype methods.
  */
 
-LoaderCache.prototype = Emitter({
+LoaderCache.prototype = {
   contructor: LoaderCache,
-
-  // get: function (type, name) {
-  //   return this[type].get(name);
-  // },
-
-  // resolve: function (type, stack) {
-  //   var args = [].slice.call(arguments, 1);
-  //   var fn = this[type].resolve;
-  //   return fn.apply(this[type], args);
-  // },
-
-  /**
-   * Set an option.
-   *
-   * @param  {String|Object} `prop` Option key or object.
-   * @param  {*} `value`
-   * @api public
-   */
-
-  option: function(prop, value) {
-    var len = arguments.length;
-    var type = typeof prop;
-
-    if (type === 'string' && len === 1) {
-      return get(this.options, prop);
-    } else if (type === 'object') {
-      utils.visit(this, 'option', prop);
-      return this;
-    }
-
-    set(this.options, prop, value);
-    this.emit('option', prop, value);
-    return this;
-  },
 
   /**
    * Decorate the given method onto the LoaderCache instance.
@@ -108,19 +73,32 @@ LoaderCache.prototype = Emitter({
       fn = options;
       options = {};
     }
-
     this[type] = new LoaderType(options, fn.bind(this));
     this.setLoaderType(type);
     return this;
   },
 
   /**
-   * Set a loader.
+   * Register a loader. The first argument is the name of the loader to register.
+   *
+   * ```js
+   * // create a loader from other loaders.
+   * app.loader('foo', ['bar', 'baz']);
+   * // pass a function
+   * app.loader('foo', function(patterns, options) {
+   *   return glob.sync(patterns, options);
+   * });
+   * // combination
+   * app.loader('foo', ['bar', 'baz'], function(patterns, options) {
+   *   return glob.sync(patterns, options);
+   * });
+   * ```
    *
    * @param  {String} `name`
    * @param  {Object} `options`
    * @param  {Function|Array} `fns` One or more loader functions or names of other registered loaders.
    * @return {Array}
+   * @api public
    */
 
   loader: function(name/*, options, fns*/) {
@@ -131,7 +109,7 @@ LoaderCache.prototype = Emitter({
     return this;
   },
 
-  seq: function (type, stack) {
+  seq: function (type/*, stack*/) {
     var args = this.resolve([].slice.call(arguments, 1));
     var iterator = this[type].iterator.fn;
     return iterator(args);
@@ -152,12 +130,28 @@ LoaderCache.prototype = Emitter({
     return type;
   },
 
+  /**
+   * Compose the actual `load` function from a loader stack.
+   *
+   * ```js
+   * var fn = app.compose('foo');
+   * // load some files
+   * var files = fn('*.txt');
+   * ```
+   *
+   * @param  {String} `name` The name of the loader stack to use.
+   * @param  {Object} `options`
+   * @param  {Array|Function} `stack` Additional loader names or functions.
+   * @return {Function}
+   * @api public
+   */
+
   compose: function(name, options, stack) {
     var args = utils.slice(arguments);
     var opts = {};
     name = args.shift();
 
-    if (!utils.isLoader(options)) {
+    if (!utils.isLoader(options) && isObject(options)) {
       opts = args.shift();
     }
 
@@ -167,7 +161,6 @@ LoaderCache.prototype = Emitter({
 
     var inst = this[type];
     var iterator = this.iterator(type);
-
     stack = inst.resolve(inst.get(name).concat(args));
 
     var ctx = { app: this };
@@ -177,7 +170,7 @@ LoaderCache.prototype = Emitter({
 
     return function () {
       var args = [].slice.call(arguments).filter(Boolean);
-      var len = args.length, loaders = [], cb = null;
+      var len = args.length, loaders = [];
 
       while (len-- > 1) {
         var arg = args[len];
@@ -190,22 +183,23 @@ LoaderCache.prototype = Emitter({
 
       // if loading is async, move the done function to args
       if (type === 'async') {
-        args = args.concat(loaders.pop());
+        args.push(loaders.pop());
       }
 
       loaders = inst.resolve(loaders);
       if (loaders.length === 0) {
-        loaders = inst.resolve(opts.defaultLoader || [])
+        loaders = inst.resolve(opts.defaultLoader || []);
       }
 
       var wrapped = loaders.map(opts.wrap || utils.identity);
 
       // create the actual `load` function
       var load = iterator.call(this, wrapped);
-      return load.apply(ctx, args);
+      var res = load.apply(ctx, args);
+      return res;
     }.bind(this);
   }
-});
+};
 
 /**
  * Expose `LoaderCache`
