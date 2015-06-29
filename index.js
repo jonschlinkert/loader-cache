@@ -108,6 +108,7 @@ LoaderCache.prototype = Emitter({
       fn = options;
       options = {};
     }
+
     this[type] = new LoaderType(options, fn.bind(this));
     this.setLoaderType(type);
     return this;
@@ -160,6 +161,7 @@ LoaderCache.prototype = Emitter({
       opts = args.shift();
     }
 
+    opts = opts || {};
     var type = this.getLoaderType(opts);
     opts.loaderType = type;
 
@@ -195,6 +197,7 @@ LoaderCache.prototype = Emitter({
       if (loaders.length === 0) {
         loaders = inst.resolve(opts.defaultLoader || [])
       }
+
       var wrapped = loaders.map(opts.wrap || utils.identity);
 
       // create the actual `load` function
