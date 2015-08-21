@@ -229,7 +229,7 @@ describe('loaders async:', function () {
     function baz (contents, next) { next(null, contents); }
     loaders.loader('foo', bar, ['read'], baz, ['yaml']);
     loaders.async.should.have.property('foo');
-    console.log(loaders.async)
+    // console.log(loaders.async)
     loaders.async.foo.length.should.be.eql(4);
   });
 

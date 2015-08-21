@@ -1,11 +1,15 @@
 'use strict';
 
-var isObject = require('is-extendable');
-var extend = require('extend-shallow');
-var get = require('get-value');
-var set = require('set-value');
 var LoaderType = require('./lib/type');
 var utils = require('./lib/utils');
+
+/**
+ * lazily required module dependencies
+ */
+
+var lazy = require('lazy-cache')(require);
+lazy('is-extendable', 'isObject');
+lazy('extend-shallow', 'extend');
 
 /**
  * Create a new instance of `LoaderCache`
@@ -133,7 +137,7 @@ LoaderCache.prototype = {
   },
 
   getLoaderType: function(options) {
-    var opts = extend({loaderType: this.defaultType}, options);
+    var opts = lazy.extend({loaderType: this.defaultType}, options);
     var type = opts.loaderType || 'sync';
     if (!this[type]) {
       throw new Error('LoaderCache: invalid loader type: ' + type);
@@ -163,7 +167,7 @@ LoaderCache.prototype = {
     var opts = {};
     name = args.shift();
 
-    if (!utils.isLoader(options) && isObject(options)) {
+    if (!utils.isLoader(options) && lazy.isObject(options)) {
       opts = args.shift();
     }
 
